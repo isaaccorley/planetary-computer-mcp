@@ -1,0 +1,46 @@
+{
+  "name": "planetary-computer-mcp-vscode",
+  "displayName": "Planetary Computer MCP",
+  "description": "VS Code extension to run and interact with the Planetary Computer MCP server",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "publisher": "isaaccorley",
+  "icon": "assets/icon.png",
+  "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaaccorley/planetary-computer-mcp.git"
+  },
+  "activationEvents": [
+    "onCommand:planetary-computer.start",
+    "onCommand:planetary-computer.stop"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "planetary-computer.start",
+        "title": "Planetary Computer: Start MCP Server"
+      },
+      {
+        "command": "planetary-computer.stop",
+        "title": "Planetary Computer: Stop MCP Server"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -p ./ -w",
+    "prepack": "npm run compile",
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish --pat $VSCE_TOKEN"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0",
+    "@types/vscode": "^1.60.0",
+    "@vscode/vsce": "^3.7.1"
+  },
+  "dependencies": {}
+}

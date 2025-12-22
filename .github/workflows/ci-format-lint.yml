@@ -1,0 +1,28 @@
+name: CI — Format & Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "latest"
+
+      - name: Install
+        run: bun install
+
+      - name: Check formatting (Prettier)
+        run: bunx prettier --check .
+
+      - name: Run linter
+        run: bun run lint
