@@ -3987,11 +3987,19 @@ export async function stopServer() {
 }
 
 // If this module is executed directly (CLI), start the server and hook fatal errors
-if (
-  (process.argv[1] && process.argv[1].endsWith("src/index.ts")) ||
-  (process.argv[1] && process.argv[1].endsWith("src/index.js")) ||
-  (process.argv[1] && process.argv[1].endsWith("dist/src/index.js"))
-) {
+// Check for direct execution via various paths:
+// - Local dev: src/index.ts, src/index.js, dist/src/index.js
+// - npm/npx global: symlink named "planetary-computer-mcp"
+// - npx execution: _npx cache paths
+const scriptPath = process.argv[1] ?? "";
+const isDirectExecution =
+  scriptPath.endsWith("src/index.ts") ||
+  scriptPath.endsWith("src/index.js") ||
+  scriptPath.endsWith("dist/src/index.js") ||
+  scriptPath.endsWith("planetary-computer-mcp") ||
+  scriptPath.includes("planetary-computer-mcp");
+
+if (isDirectExecution) {
   startServer().catch((error) => {
     console.error("Fatal error:", error);
     process.exit(1);
