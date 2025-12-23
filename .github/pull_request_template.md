@@ -15,6 +15,4 @@
 - [ ] Tests pass locally (`bun test`)
 - [ ] Lint/formatting OK (`bun format` / `bun check`)
 - [ ] Relevant docs updated
-- [ ] PR title follows [conventional commit format](.github/commit-convention.md) (required for automated releases)
-
-```
+- [ ] PR title follows [conventional commit format](CONTRIBUTING.md#commit-message-convention) (required for automated releases)
