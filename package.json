@@ -35,9 +35,7 @@
     "test:dem": "bun run test/test-cog-dem.ts",
     "test:lulc": "bun run test/test-cog-lulc.ts",
     "test:daymet": "bun run test/test-daymet-na.ts",
-    "test:integration": "bun run test:cog && bun run test:zarr && bun run test:vector && bun run test:modis && bun run test:optical && bun run test:naip && bun run test:dem && bun run test:lulc && bun run test:daymet",
-    "package:vsix": "cd vscode-extension && npm install && npx vsce package",
-    "prepare-extension": "cd vscode-extension && npm install"
+    "test:integration": "bun run test:cog && bun run test:zarr && bun run test:vector && bun run test:modis && bun run test:optical && bun run test:naip && bun run test:dem && bun run test:lulc && bun run test:daymet"
   },
   "keywords": [
     "mcp",

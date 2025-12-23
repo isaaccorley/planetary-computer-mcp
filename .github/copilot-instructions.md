@@ -60,7 +60,6 @@ bunx @modelcontextprotocol/inspector node dist/src/index.js  # Test
 ## Publishing
 
 - **NPM:** Add `NPM_TOKEN` secret; use `Prepare Release` workflow to bump version and publish
-- **VS Code Extension:** Add `VSCE_TOKEN` secret; combined workflow publishes both on Release
 
 ## MCP Integration
 
