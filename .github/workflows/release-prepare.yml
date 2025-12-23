@@ -1,27 +1,24 @@
-name: Prepare Release (bump version and create GitHub release)
+name: Prepare Release (semantic release)
 
 on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: "Version bump (patch, minor, major)"
-        required: true
-        default: "patch"
+  push:
+    branches: [main]
 
 jobs:
-  bump-and-release:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      metadata: read
-
+      issues: write
+      pull_requests: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "18"
@@ -29,58 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bump version
-        id: bump
-        run: |
-          set -e
-          echo "BUMP=${{ github.event.inputs.bump }}"
-          npm version ${{ github.event.inputs.bump }} -m "chore(release): %s [skip ci]"
-          # Output the created tag
-          echo "TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+      - name: Build
+        run: npm run build
 
-      - name: Push tag
-        run: |
-          git push origin --tags
-
-      - name: Generate changelog for release
-        id: changelog
-        run: |
-          set -e
-          NEW_TAG=${{ steps.bump.outputs.TAG }}
-          # Ensure tags are available
-          git fetch --tags
-          # Determine previous tag (if any)
-          PREV_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || true)
-          echo "Preparing changelog: new=${NEW_TAG} prev=${PREV_TAG}"
-          if [ -n "$PREV_TAG" ]; then
-            git --no-pager log ${PREV_TAG}..${NEW_TAG} --pretty=format:"- %s (%an)" --no-merges > release_notes.md || true
-          else
-            git --no-pager log ${NEW_TAG} --pretty=format:"- %s (%an)" --no-merges > release_notes.md || true
-          fi
-          echo "# Release ${NEW_TAG}" > release_header.md
-          echo "" >> release_header.md
-          cat release_header.md release_notes.md > release_body.md
-          echo "RELEASE_BODY<<EOF" >> $GITHUB_OUTPUT
-          sed 's/^/ /' release_body.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release with notes
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const tag = process.env.NEW_TAG || '${{ steps.bump.outputs.TAG }}';
-            const body = fs.readFileSync('release_body.md', 'utf8');
-            const release = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: tag,
-              name: tag,
-              body: body,
-              draft: false,
-              prerelease: false,
-            });
-            console.log('Created release:', release.data.html_url);
+      - name: Release
         env:
-          NEW_TAG: ${{ steps.bump.outputs.TAG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release

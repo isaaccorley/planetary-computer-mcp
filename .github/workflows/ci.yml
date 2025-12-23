@@ -1,0 +1,59 @@
+name: CI — Format & Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "latest"
+
+      - name: Install
+        run: bun install
+
+      - name: Check formatting (Prettier)
+        run: bunx prettier --check .
+
+      - name: Run linter
+        run: bun run lint
+
+      - name: Check conventional commits
+        if: github.event_name == 'pull_request'
+        run: |
+          # Get the PR number
+          PR_NUMBER=${{ github.event.number }}
+          
+          # Get PR title and body
+          PR_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER")
+          
+          PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
+          PR_BODY=$(echo "$PR_DATA" | jq -r '.body // ""')
+          
+          echo "PR Title: $PR_TITLE"
+          
+          # Check if title follows conventional commit format
+          if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?: .{1,}'; then
+            echo "❌ PR title does not follow conventional commit format"
+            echo "Expected format: type(scope): description"
+            echo "Examples:"
+            echo "  feat: add new feature"
+            echo "  fix: resolve bug"
+            echo "  docs: update documentation"
+            echo "  refactor: improve code structure"
+            exit 1
+          fi
+          
+          echo "✅ PR title follows conventional commit format"

@@ -21,6 +21,7 @@
     "test": "bun test",
     "check:prettier": "bunx prettier --check .",
     "check": "bun run typecheck && bun run check:prettier && bun run lint && bun test",
+    "semantic-release": "semantic-release",
     "test:cog": "bun run test/test-cog.ts",
     "test:zarr": "bun run test/test-zarr.ts",
     "test:vector": "bun run test/test-ms-buildings.ts",
@@ -64,6 +65,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@types/node": "^22.10.1",
     "@types/proj4": "^2.5.6",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
@@ -73,6 +76,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
+    "semantic-release": "^24.2.0",
     "typescript": "^5.7.2"
   },
   "lint-staged": {

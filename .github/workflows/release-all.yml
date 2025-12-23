@@ -1,14 +1,12 @@
-name: Release - Build & Publish (npm + VS Code)
+name: Release - Publish VS Code Extension
 
 on:
   release:
     types: [published]
 
 jobs:
-  build-and-publish:
+  publish-vscode-extension:
     runs-on: ubuntu-latest
-    env:
-      NODE_OPTIONS: "--max-old-space-size=4096"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,36 +19,25 @@ jobs:
       - name: Install root dependencies (bun)
         run: bun install
 
-      - name: Build root TypeScript (bun)
+      - name: Build server
         run: bun run build
 
-      - name: Setup Node for npm publish
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          registry-url: https://registry.npmjs.org
-
-      - name: Publish package to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          # ensure package version is ready
-          npm publish --access public
-
-      - name: Build & package VS Code extension
+      - name: Prepare extension
         working-directory: vscode-extension
         run: |
-          npm install --no-audit --no-fund
+          npm ci
           npm run compile
-          printf 'y\n' | npx vsce package
 
-      - name: Publish VS Code extension
+      - name: Package extension
+        working-directory: vscode-extension
+        run: npx vsce package
+
+      - name: Publish extension
+        if: secrets.VSCE_TOKEN != ''
         working-directory: vscode-extension
         env:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
-        run: |
-          # publish vsix via vsce
-          npx vsce publish --pat $VSCE_TOKEN || true
+        run: npx vsce publish --pat $VSCE_TOKEN
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
