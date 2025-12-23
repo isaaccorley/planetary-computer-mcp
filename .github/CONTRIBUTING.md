@@ -21,11 +21,13 @@ bun run mcp
 This project uses [Conventional Commits](https://conventionalcommits.org/) for automated versioning and changelog generation.
 
 ### Format
+
 ```
 <type>[optional scope]: <description>
 ```
 
 ### Types
+
 - `feat`: New features (minor version bump)
 - `fix`: Bug fixes (patch version bump)
 - `docs`: Documentation changes
@@ -39,6 +41,7 @@ This project uses [Conventional Commits](https://conventionalcommits.org/) for a
 - `revert`: Reverting changes
 
 ### Examples
+
 ```
 feat: add Sentinel-2 L2A imagery support
 fix: resolve memory leak in Zarr processing
@@ -48,12 +51,15 @@ chore: update dependencies
 ```
 
 ### Breaking Changes
+
 Add `!` after the type for breaking changes:
+
 ```
 feat!: remove deprecated API endpoints
 ```
 
 ### Why?
+
 - Automated semantic versioning
 - Auto-generated changelogs
 - Consistent commit history
