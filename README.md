@@ -1,7 +1,6 @@
 # 🌍 planetary-computer-mcp
 
 [![npm version](https://img.shields.io/npm/v/planetary-computer-mcp.svg)](https://www.npmjs.com/package/planetary-computer-mcp)
-[![VS Code Extension](https://img.shields.io/badge/VS%20Code%20Extension-Install-blue?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=isaaccorley.planetary-computer-mcp-vscode)
 [![Website](https://img.shields.io/badge/Website-isaacc.dev%2Fplanetary--computer--mcp-blue)](https://isaacc.dev/planetary-computer-mcp)
 [![License](https://img.shields.io/npm/l/planetary-computer-mcp.svg)](https://github.com/isaaccorley/planetary-computer-mcp/blob/main/LICENSE)
 
@@ -31,6 +30,24 @@ A Model Context Protocol (MCP) server that connects AI assistants to the [Micros
 <td align="center"><img src="assets/images/pet_preview.png" width="200"><br><sub><b>TerraClimate PET</b><br>Zarr Preview</sub></td>
 </tr>
 </table>
+
+## Add to VSCode, Cursor, Antigravity
+
+Add the following to your mcp.json file (Cmd+Shift+P -> MCP: Add Server)
+
+```json
+{
+  "servers": {
+    ...
+    "planetary-computer": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "planetary-computer-mcp@latest"]
+    },
+  ...
+  }
+}
+```
 
 ## Install
 
