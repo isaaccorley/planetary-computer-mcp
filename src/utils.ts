@@ -92,7 +92,7 @@ export interface STACCollectionDetail {
       "classification:classes"?: Array<{
         value: number;
         description: string;
-        colorHint?: string; // hex RGB without #
+        "color-hint"?: string; // hex RGB without #
       }>;
     }
   >;

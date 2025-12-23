@@ -2,8 +2,6 @@
 
 A Visual Studio Code extension that provides seamless integration with the Planetary Computer MCP server, enabling AI assistants to query satellite imagery and geospatial data directly within VS Code.
 
-<img src="assets/icon.png" alt="Planetary Computer MCP Extension Icon" width="64" height="64">
-
 This extension implements an [MCP server](https://spec.modelcontextprotocol.io/) for the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) STAC catalog, allowing AI assistants to search and download satellite imagery, DEMs, land cover data, and vector datasets.
 
 ## Features
@@ -69,11 +67,16 @@ Once the server is running, AI assistants can use these tools:
 
 ### Example Queries
 
-```
+```bash
 Find recent Sentinel-2 imagery over Seattle from June 2024
-Download a true-color image of Mount Rainier
-Get multispectral bands for vegetation analysis in California
-Search for NAIP aerial imagery in Washington state
+
+Download building footprints for San Francisco
+
+Create a heatmap of the temperature data in NYC in 2000 and in 2020
+
+Get multispectral bands for vegetation analysis in the Smoky Mountains
+
+Download NAIP imagery of Miami Airport
 ```
 
 ### Stopping the Server

@@ -32,9 +32,9 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -p ./ -w",
-    "prepack": "npm run compile",
-    "package": "npx @vscode/vsce package",
-    "publish": "npx @vscode/vsce publish --pat $VSCE_TOKEN"
+    "prepack": "bun run compile",
+    "package": "bunx @vscode/vsce package",
+    "publish": "bunx @vscode/vsce publish --pat $VSCE_TOKEN"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",

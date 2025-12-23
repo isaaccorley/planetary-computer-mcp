@@ -3988,6 +3988,7 @@ export async function stopServer() {
 
 // If this module is executed directly (CLI), start the server and hook fatal errors
 if (
+  (process.argv[1] && process.argv[1].endsWith("src/index.ts")) ||
   (process.argv[1] && process.argv[1].endsWith("src/index.js")) ||
   (process.argv[1] && process.argv[1].endsWith("dist/src/index.js"))
 ) {

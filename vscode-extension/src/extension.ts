@@ -1,5 +1,4 @@
 import { ChildProcess, spawn } from "child_process";
-import * as path from "path";
 import * as vscode from "vscode";
 
 let serverProcess: ChildProcess | null = null;
@@ -13,16 +12,15 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    // Resolve the dist entry relative to extension (assumes repo root compiled)
-    const extensionRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-    const serverPath = path.join(extensionRoot, "dist", "src", "index.js");
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-    out.appendLine(`Starting MCP server: node ${serverPath}`);
+    out.appendLine("Starting MCP server: npx planetary-computer-mcp");
 
-    serverProcess = spawn(process.execPath, [serverPath], {
-      cwd: extensionRoot,
+    serverProcess = spawn("npx", ["-y", "planetary-computer-mcp"], {
+      cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
     });
 
     serverProcess.stdout?.on("data", (data) => out.appendLine(String(data)));

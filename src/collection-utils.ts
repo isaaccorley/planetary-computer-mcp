@@ -28,11 +28,11 @@ export function extractClassificationInfo(
       const classes = asset["classification:classes"] as Array<{
         value: number;
         description: string;
-        colorHint?: string;
+        "color-hint"?: string;
       }>;
 
       const colors: ClassificationColor[] = classes.map((c) => {
-        const rgb = c.colorHint ? hexToRgb(c.colorHint) : { r: 128, g: 128, b: 128 };
+        const rgb = c["color-hint"] ? hexToRgb(c["color-hint"]) : { r: 128, g: 128, b: 128 };
         return {
           value: c.value,
           r: rgb.r,

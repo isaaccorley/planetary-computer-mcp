@@ -1,11 +1,14 @@
-# planetary-computer-mcp
+# 🌍 planetary-computer-mcp
 
-TypeScript MCP server for querying the Microsoft Planetary Computer STAC catalog. Supports spatial/temporal queries and downloading GeoTIFF assets.
+> **Access petabytes of Earth observation data through natural conversation.**
+
+A Model Context Protocol (MCP) server that connects AI assistants to the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) — unlocking satellite imagery, climate data, land cover maps, and more. Query Sentinel-2, Landsat, NAIP aerial imagery, global DEMs, and 120+ geospatial datasets using simple spatial and temporal filters.
 
 ## Install
 
 ```bash
 npm install -g planetary-computer-mcp
+
 # or locally
 npx planetary-computer-mcp
 bunx planetary-computer-mcp
@@ -16,13 +19,14 @@ bunx planetary-computer-mcp
 ### Tools
 
 - **`search_stac`**: Query STAC catalog by collection, bbox, datetime, limit
-- **`list_collections`**: List available collections with caching
-- **`list_collections_summary`**: Compact JSON summary of collections
-- **`describe_collection`**: Summarize collection details and tooling
+- **`get_collections`**: List all collections or get detailed info for a specific collection (assets, bands, resolutions)
+- **`describe_collection`**: Get structured metadata with RGB/DEM/SAR strategy and recommended tools
 - **`download_asset`**: Download GeoTIFF/assets with auto URL signing
-- **`download_visual`**: Download RGB images with smart rendering (JPG/PNG)
+- **`download_visual`**: Download RGB images with smart rendering (JPG for optical/DEM, PNG for classified)
 - **`download_multispectral`**: Download specific bands into multi-band GeoTIFF
 - **`download_geometries`**: Download vector data (e.g., MS Buildings) with spatial filtering
+- **`download_zarr`**: Download spatial/temporal slices from Zarr collections (Daymet, ERA5, TerraClimate)
+- **`render_zarr_preview`**: Create heatmap PNG previews from downloaded Zarr data
 
 **Supported Collections:**
 
@@ -31,24 +35,7 @@ bunx planetary-computer-mcp
 - Land Cover: esa-worldcover, io-lulc-annual-v02, mtbs
 - SAR: sentinel-1-rtc
 - Vector: ms-buildings
-
-## Development
-
-```bash
-bun install          # Install deps
-bun run build        # Compile to dist/
-bun run watch        # Watch mode
-bun run test         # Run tests
-bun run lint         # Lint
-```
-
-### Local Testing
-
-```bash
-bun run build
-node dist/src/index.js  # Run server
-bunx @modelcontextprotocol/inspector node dist/src/index.js  # Test with inspector
-```
+- Climate/Weather: daymet-daily-na, daymet-daily-hi, daymet-daily-pr, era5-pds, terraclimate
 
 ## Examples
 
@@ -56,6 +43,8 @@ bunx @modelcontextprotocol/inspector node dist/src/index.js  # Test with inspect
 - **Visual Download**: `download_visual(collection="sentinel-2-l2a", bbox=[-122.4,47.6,-122.3,47.7], datetime="2024-06-01/2024-06-30")`
 - **Multispectral**: `download_multispectral(collection="sentinel-2-l2a", assets=["B04","B08"], bbox=..., datetime=...)`
 - **Buildings**: `download_geometries(collection="ms-buildings", bbox=[-122.35,47.6,-122.32,47.62])`
+- **Climate Data**: `download_zarr(collection="daymet-daily-na", assets=["tmax","tmin"], bbox=[-122.5,47,-122,47.5], datetime="2024-01-01/2024-01-31")`
+- **Zarr Preview**: `render_zarr_preview(zarr_path="path/to/daymet_daily_na/tmax")`
 
 ## MCP Integration
 
@@ -79,3 +68,14 @@ Add to client config:
 - **API**: Planetary Computer STAC catalog
 - **DuckDB**: Spatial queries on parquet
 - **Features**: Auto URL signing, streaming downloads, collection caching
+
+## Development
+
+```bash
+bun install               # Install deps
+bun run build             # Compile to dist/
+bun run format            # Format code
+bun run check             # Typecheck, lint, prettier, tests
+bun run test:integration  # Run all integration tests
+bun run mcp               # Start MCP server
+```

@@ -3,17 +3,14 @@ name: Release
 on:
   push:
     branches: [main]
-  release:
-    types: [published]
 
 jobs:
   release:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
-      pull_requests: write
+      pull-requests: write
       id-token: write
     steps:
       - name: Checkout
@@ -37,80 +34,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
-
-  check-npm-published:
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    outputs:
-      npm_version: ${{ steps.check.outputs.version }}
-    steps:
-      - name: Check npm package is published
-        id: check
-        run: |
-          # Wait for npm publish to propagate
-          sleep 60
-
-          # Get the latest version from npm
-          NPM_VERSION=$(curl -s "https://registry.npmjs.org/planetary-computer-mcp/latest" | jq -r '.version')
-          # Remove 'v' prefix from release tag if present
-          RELEASE_TAG=${GITHUB_REF#refs/tags/}
-          RELEASE_VERSION=${RELEASE_TAG#v}
-
-          echo "NPM version: $NPM_VERSION"
-          echo "Release tag: $RELEASE_TAG"
-          echo "Expected version: $RELEASE_VERSION"
-
-          if [ "$NPM_VERSION" = "$RELEASE_VERSION" ]; then
-            echo "✅ NPM package published successfully"
-            echo "version=$NPM_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "❌ NPM package not found or version mismatch"
-            echo "Expected: $RELEASE_VERSION, Found: $NPM_VERSION"
-            exit 1
-          fi
-
-  publish-vscode-extension:
-    if: github.event_name == 'release'
-    needs: check-npm-published
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: "latest"
-
-      - name: Install root dependencies (bun)
-        run: bun install
-
-      - name: Build server
-        run: bun run build
-
-      - name: Prepare extension
-        working-directory: vscode-extension
-        run: |
-          npm ci
-          npm run compile
-
-      - name: Package extension
-        working-directory: vscode-extension
-        run: npx vsce package
-
-      - name: Publish extension
-        working-directory: vscode-extension
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
-        run: |
-          if [ -n "$VSCE_PAT" ]; then
-            npx vsce publish --pat "$VSCE_PAT"
-          else
-            echo "⚠️ VSCE_TOKEN not set, skipping VS Code extension publish"
-          fi
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vscode-extension-vsix
-          path: vscode-extension/*.vsix

@@ -9,7 +9,7 @@
     "planetary-computer-mcp": "./dist/src/index.js"
   },
   "scripts": {
-    "build": "bunx tsc",
+    "build": "bunx tsc && echo 'Build complete: dist/src/index.js'",
     "watch": "bunx tsc --watch",
     "prepare": "husky",
     "prepublishOnly": "bun run build",
