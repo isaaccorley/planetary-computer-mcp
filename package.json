@@ -6,7 +6,11 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "planetary-computer-mcp": "./dist/src/index.js"
+    "planetary-computer-mcp": "dist/src/index.js"
+  },
+  "engines": {
+    "node": ">=18",
+    "bun": ">=1.0.0"
   },
   "scripts": {
     "build": "bunx tsc && echo 'Build complete: dist/src/index.js'",
@@ -37,12 +41,19 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "stac",
     "planetary-computer",
-    "geospatial"
+    "geospatial",
+    "satellite",
+    "sentinel",
+    "landsat",
+    "earth-observation",
+    "remote-sensing",
+    "gis"
   ],
   "author": "Isaac Corley <isaac.corley@proton.me>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isaaccorley/planetary-computer-mcp.git"
@@ -50,6 +61,7 @@
   "bugs": {
     "url": "https://github.com/isaaccorley/planetary-computer-mcp/issues"
   },
+  "homepage": "https://github.com/isaaccorley/planetary-computer-mcp#readme",
   "files": [
     "dist/**/*",
     "README.md",
@@ -91,10 +103,6 @@
       "prettier --write",
       "git add"
     ]
-  },
-  "engines": {
-    "node": ">=18",
-    "bun": ">=1.0.0"
   },
   "packageManager": "bun@1.3.5"
 }

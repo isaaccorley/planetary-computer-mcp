@@ -1,5 +1,9 @@
 # 🌍 planetary-computer-mcp
 
+[![npm version](https://img.shields.io/npm/v/planetary-computer-mcp.svg)](https://www.npmjs.com/package/planetary-computer-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/planetary-computer-mcp.svg)](https://www.npmjs.com/package/planetary-computer-mcp)
+[![License](https://img.shields.io/npm/l/planetary-computer-mcp.svg)](https://github.com/isaaccorley/planetary-computer-mcp/blob/main/LICENSE)
+
 > **Access petabytes of Earth observation data through natural conversation.**
 
 A Model Context Protocol (MCP) server that connects AI assistants to the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) — unlocking satellite imagery, climate data, land cover maps, and more. Query Sentinel-2, Landsat, NAIP aerial imagery, global DEMs, and 120+ geospatial datasets using simple spatial and temporal filters.
