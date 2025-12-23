@@ -1,8 +1,33 @@
-# Planetary Computer MCP — VS Code Extension
+# 🌍 Planetary Computer MCP — VS Code Extension
+
+> **Access petabytes of Earth observation data through your AI assistant in VS Code.**
 
 A Visual Studio Code extension that provides seamless integration with the Planetary Computer MCP server, enabling AI assistants to query satellite imagery and geospatial data directly within VS Code.
 
 This extension implements an [MCP server](https://spec.modelcontextprotocol.io/) for the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) STAC catalog, allowing AI assistants to search and download satellite imagery, DEMs, land cover data, and vector datasets.
+
+## Sample Outputs
+
+<table>
+<tr>
+<td align="center"><img src="../assets/images/sentinel_2_l2a_alps.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Alps</sub></td>
+<td align="center"><img src="../assets/images/sentinel_2_l2a_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Miami</sub></td>
+<td align="center"><img src="../assets/images/naip_small-seattle.jpg" width="200"><br><sub><b>NAIP</b><br>Seattle</sub></td>
+<td align="center"><img src="../assets/images/naip_medium-la.jpg" width="200"><br><sub><b>NAIP</b><br>Los Angeles</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="../assets/images/hls2_l30_medium-la.jpg" width="200"><br><sub><b>HLS L30</b><br>Los Angeles</sub></td>
+<td align="center"><img src="../assets/images/modis_09A1_061_large-bay.jpg" width="200"><br><sub><b>MODIS</b><br>Bay Area</sub></td>
+<td align="center"><img src="../assets/images/sentinel_1_rtc_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-1 SAR</b><br>Miami</sub></td>
+<td align="center"><img src="../assets/images/cop_dem_glo_30_coastal-miami.jpg" width="200"><br><sub><b>Copernicus DEM</b><br>Miami</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="../assets/images/esa_worldcover_alps.png" width="200"><br><sub><b>ESA WorldCover</b><br>Alps</sub></td>
+<td align="center"><img src="../assets/images/io_lulc_annual_v02_rural-iowa.png" width="200"><br><sub><b>IO LULC</b><br>Iowa</sub></td>
+<td align="center"><img src="../assets/images/ms-buildings.jpg" width="200"><br><sub><b>MS Buildings</b><br>Vector Data</sub></td>
+<td align="center"><img src="../assets/images/pet_preview.png" width="200"><br><sub><b>TerraClimate PET</b><br>Zarr Preview</sub></td>
+</tr>
+</table>
 
 ## Features
 
@@ -29,14 +54,14 @@ git clone https://github.com/isaaccorley/planetary-computer-mcp.git
 cd planetary-computer-mcp
 ```
 
-1. Build the MCP server:
+2. Build the MCP server:
 
 ```bash
 bun install
 bun run build
 ```
 
-1. Build and install the extension:
+3. Build and install the extension:
 
 ```bash
 cd vscode-extension
@@ -44,7 +69,7 @@ bun install
 bun run package
 ```
 
-1. Install the generated `.vsix` file in VS Code
+4. Install the generated `.vsix` file in VS Code
 
 ## Usage
 
