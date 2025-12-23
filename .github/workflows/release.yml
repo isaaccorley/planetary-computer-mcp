@@ -1,11 +1,77 @@
-name: Release - Publish VS Code Extension
+name: Release
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
 
 jobs:
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull_requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
+
+  check-npm-published:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    outputs:
+      npm_version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Check npm package is published
+        id: check
+        run: |
+          # Wait for npm publish to propagate
+          sleep 60
+
+          # Get the latest version from npm
+          NPM_VERSION=$(curl -s "https://registry.npmjs.org/planetary-computer-mcp/latest" | jq -r '.version')
+          # Remove 'v' prefix from release tag if present
+          RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          RELEASE_VERSION=${RELEASE_TAG#v}
+
+          echo "NPM version: $NPM_VERSION"
+          echo "Release tag: $RELEASE_TAG"
+          echo "Expected version: $RELEASE_VERSION"
+
+          if [ "$NPM_VERSION" = "$RELEASE_VERSION" ]; then
+            echo "✅ NPM package published successfully"
+            echo "version=$NPM_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "❌ NPM package not found or version mismatch"
+            echo "Expected: $RELEASE_VERSION, Found: $NPM_VERSION"
+            exit 1
+          fi
+
   publish-vscode-extension:
+    if: github.event_name == 'release'
+    needs: check-npm-published
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,11 +99,15 @@ jobs:
         run: npx vsce package
 
       - name: Publish extension
-        if: secrets.VSCE_TOKEN != ''
         working-directory: vscode-extension
         env:
-          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
-        run: npx vsce publish --pat $VSCE_TOKEN
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            npx vsce publish --pat "$VSCE_PAT"
+          else
+            echo "⚠️ VSCE_TOKEN not set, skipping VS Code extension publish"
+          fi
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4

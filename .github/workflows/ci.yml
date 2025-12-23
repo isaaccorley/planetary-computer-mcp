@@ -1,4 +1,4 @@
-name: CI — Format & Lint
+name: CI
 
 on:
   push:
@@ -29,31 +29,19 @@ jobs:
       - name: Run linter
         run: bun run lint
 
-      - name: Check conventional commits
-        if: github.event_name == 'pull_request'
-        run: |
-          # Get the PR number
-          PR_NUMBER=${{ github.event.number }}
-
-          # Get PR title and body
-          PR_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER")
-
-          PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
-          PR_BODY=$(echo "$PR_DATA" | jq -r '.body // ""')
-
-          echo "PR Title: $PR_TITLE"
-
-          # Check if title follows conventional commit format
-          if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?: .{1,}'; then
-            echo "❌ PR title does not follow conventional commit format"
-            echo "Expected format: type(scope): description"
-            echo "Examples:"
-            echo "  feat: add new feature"
-            echo "  fix: resolve bug"
-            echo "  docs: update documentation"
-            echo "  refactor: improve code structure"
-            exit 1
-          fi
-
-          echo "✅ PR title follows conventional commit format"
+  semantic-title-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        with:
+          types: |
+            feat
+            fix
+            chore
+            refactor
+            perf
+            test
+            ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

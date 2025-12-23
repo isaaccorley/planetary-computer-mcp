@@ -10,6 +10,12 @@
       }
     ],
     [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node -e \"const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('./package.json')); const extPkg = JSON.parse(fs.readFileSync('./vscode-extension/package.json')); extPkg.version = '${nextRelease.version}'; fs.writeFileSync('./vscode-extension/package.json', JSON.stringify(extPkg, null, 2) + '\\n');\""
+      }
+    ],
+    [
       "@semantic-release/npm",
       {
         "npmPublish": true
@@ -18,7 +24,7 @@
     [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md", "package.json"],
+        "assets": ["CHANGELOG.md", "package.json", "vscode-extension/package.json"],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
