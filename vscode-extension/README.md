@@ -1,10 +1,10 @@
 # 🌍 Planetary Computer MCP — VS Code Extension
 
-> **Access petabytes of Earth observation data through your AI assistant in VS Code.**
+> **Access petabytes of Earth observation data through GitHub Copilot in VS Code.**
 
-A Visual Studio Code extension that provides seamless integration with the Planetary Computer MCP server, enabling AI assistants to query satellite imagery and geospatial data directly within VS Code.
+A Visual Studio Code extension that configures the Planetary Computer MCP server for GitHub Copilot, enabling AI assistants to query satellite imagery and geospatial data directly within VS Code.
 
-This extension implements an [MCP server](https://spec.modelcontextprotocol.io/) for the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) STAC catalog, allowing AI assistants to search and download satellite imagery, DEMs, land cover data, and vector datasets.
+This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) for the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) STAC catalog, allowing GitHub Copilot to search and download satellite imagery, DEMs, land cover data, and vector datasets.
 
 ## Sample Outputs
 
@@ -31,11 +31,11 @@ This extension implements an [MCP server](https://spec.modelcontextprotocol.io/)
 
 ## Features
 
+- **One-Click Setup**: Automatically configures the MCP server in your VS Code settings
 - **Satellite Imagery Access**: Query Sentinel-2, NAIP, Landsat, and HLS collections
 - **Geospatial Downloads**: Download RGB images, multispectral bands, and vector data
+- **GitHub Copilot Integration**: Works seamlessly with VS Code's Copilot Chat
 - **Real-time Processing**: Auto URL signing and streaming downloads
-- **VS Code Integration**: Native commands to start/stop the MCP server
-- **Output Monitoring**: Server logs visible in VS Code's output panel
 
 ## Installation
 
@@ -73,16 +73,36 @@ bun run package
 
 ## Usage
 
-### Starting the Server
+### Adding the MCP Server
 
-1. Open VS Code with the extension installed
-2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-3. Run `Planetary Computer: Start MCP Server`
-4. The server will start and show logs in the `Planetary Computer MCP` output channel
+On first install, you'll be prompted to add the MCP server to your settings. You can also:
 
-### Using with AI Assistants
+1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Run `Planetary Computer: Add MCP Server`
+3. Reload VS Code when prompted
 
-Once the server is running, AI assistants can use these tools:
+This adds the following to your VS Code settings:
+
+```json
+{
+  "github.copilot.chat.mcp.servers": {
+    "planetary-computer": {
+      "command": "npx",
+      "args": ["-y", "planetary-computer-mcp"]
+    }
+  }
+}
+```
+
+### Available Commands
+
+- **`Planetary Computer: Add MCP Server`** — Add the server to your VS Code MCP settings
+- **`Planetary Computer: Remove MCP Server`** — Remove the server from settings
+- **`Planetary Computer: Check MCP Status`** — Check if the server is configured
+
+### Using with GitHub Copilot
+
+Once configured, open Copilot Chat and use these tools:
 
 - **`search_stac`**: Query satellite imagery by location, date, and collection
 - **`download_visual`**: Download RGB satellite images
@@ -104,9 +124,9 @@ Get multispectral bands for vegetation analysis in the Smoky Mountains
 Download NAIP imagery of Miami Airport
 ```
 
-### Stopping the Server
+### Removing the Server
 
-From the Command Palette, run `Planetary Computer: Stop MCP Server`
+From the Command Palette, run `Planetary Computer: Remove MCP Server`
 
 ## Supported Data Collections
 
@@ -118,11 +138,13 @@ From the Command Palette, run `Planetary Computer: Stop MCP Server`
 
 ## Configuration
 
-The extension automatically detects the compiled server in your workspace. For custom setups:
+The extension manages the MCP server configuration in your VS Code settings automatically. The server is spawned by VS Code's Copilot extension when needed.
 
-1. Ensure `dist/src/index.js` exists in the workspace root
-2. The extension uses Node.js stdio transport for communication
-3. Server logs appear in VS Code's `Planetary Computer MCP` output channel
+### Requirements
+
+- VS Code 1.60+
+- GitHub Copilot extension
+- Node.js 18+ (for running the MCP server via npx)
 
 ## Development
 
@@ -145,8 +167,8 @@ bun run compile
 ### Testing
 
 1. Press `F5` in VS Code to launch Extension Development Host
-2. Test the `Start MCP Server` command
-3. Check the output channel for server logs
+2. Test the `Add MCP Server` command
+3. Verify the settings are updated correctly
 
 ### Packaging
 
@@ -157,11 +179,12 @@ bun run package  # Creates .vsix file
 
 ## Troubleshooting
 
-### Server Won't Start
+### MCP Server Not Working
 
-- Verify `dist/src/index.js` exists in workspace root
-- Check that Node.js 18+ is installed
-- Review the `Planetary Computer MCP` output channel for errors
+- Ensure GitHub Copilot extension is installed and active
+- Run `Planetary Computer: Check MCP Status` to verify configuration
+- Reload VS Code after adding the MCP server
+- Check that Node.js 18+ is installed (`node --version`)
 
 ### No Data Returned
 
@@ -173,7 +196,7 @@ bun run package  # Creates .vsix file
 
 - Large downloads may take time due to data size
 - Use smaller bounding boxes for faster results
-- The extension uses streaming downloads to minimize memory usage
+- The server uses streaming downloads to minimize memory usage
 
 ## Contributing
 
