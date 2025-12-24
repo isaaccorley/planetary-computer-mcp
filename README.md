@@ -52,11 +52,10 @@ Add the following to your mcp.json file (Cmd+Shift+P -> MCP: Add Server)
 ## Install
 
 ```bash
-npm install -g planetary-computer-mcp
+npm install planetary-computer-mcp
 
 # or locally
-npx planetary-computer-mcp
-bunx planetary-computer-mcp
+npx planetary-computer-mcp  # or `bunx planetary-computer-mcp`
 ```
 
 ## Usage
@@ -91,27 +90,14 @@ bunx planetary-computer-mcp
 - **Climate Data**: `download_zarr(collection="daymet-daily-na", assets=["tmax","tmin"], bbox=[-122.5,47,-122,47.5], datetime="2024-01-01/2024-01-31")`
 - **Zarr Preview**: `render_zarr_preview(zarr_path="path/to/daymet_daily_na/tmax")`
 
-## MCP Integration
-
-Add to client config:
-
-```json
-{
-  "mcpServers": {
-    "planetary-computer": {
-      "command": "npx",
-      "args": ["-y", "planetary-computer-mcp"]
-    }
-  }
-}
-```
-
 ## Architecture
 
 - **Language**: TypeScript on Node.js ≥18
 - **Framework**: MCP SDK with stdio transport
 - **API**: Planetary Computer STAC catalog
-- **DuckDB**: Spatial queries on parquet
+- **Geotiff.js**: Read/Writing Cloud Optimized Geotiffs (COG)
+- **DuckDB WASM**: Spatial queries on parquet
+- **Zarrita.js**: Read/Writing with n-dimensional Zarr stores
 - **Features**: Auto URL signing, streaming downloads, collection caching
 
 ## Development

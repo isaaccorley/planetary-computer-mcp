@@ -1,0 +1,57 @@
+name: Release VS Code Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.1.0). Leave empty to use current package.json version."
+        required: false
+        type: string
+
+jobs:
+  publish-vscode-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "latest"
+
+      - name: Update version if provided
+        if: ${{ inputs.version != '' }}
+        working-directory: vscode-extension
+        run: |
+          jq '.version = "${{ inputs.version }}"' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Install dependencies
+        working-directory: vscode-extension
+        run: bun install
+
+      - name: Compile extension
+        working-directory: vscode-extension
+        run: bun run compile
+
+      - name: Package extension
+        working-directory: vscode-extension
+        run: bunx vsce package
+
+      - name: Publish extension
+        working-directory: vscode-extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            bunx vsce publish --pat "$VSCE_PAT"
+          else
+            echo "❌ VSCE_TOKEN not set, cannot publish"
+            exit 1
+          fi
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension-vsix
+          path: vscode-extension/*.vsix

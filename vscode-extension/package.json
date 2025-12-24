@@ -1,0 +1,60 @@
+{
+  "name": "planetary-computer-mcp",
+  "displayName": "Planetary Computer STAC MCP",
+  "version": "0.1.0",
+  "publisher": "isaaccorley",
+  "description": "VS Code extension to configure the Planetary Computer STAC MCP server",
+  "author": {
+    "name": "Isaac Corley"
+  },
+  "categories": [
+    "AI",
+    "Machine Learning",
+    "Other"
+  ],
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#C80000",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "planetary-computer-mcp",
+        "label": "Planetary Computer MCP Server"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -p ./ -w",
+    "prepack": "bun run compile",
+    "package": "bunx @vscode/vsce package",
+    "publish": "bunx @vscode/vsce publish --pat $VSCE_TOKEN"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0",
+    "@types/vscode": "^1.60.0",
+    "@vscode/vsce": "^3.7.1"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/isaaccorley/planetary-computer-mcp/issues",
+    "email": "isaac.corley@proton.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaaccorley/planetary-computer-mcp.git"
+  },
+  "homepage": "https://github.com/isaaccorley/planetary-computer-mcp/blob/main/README.md"
+}
