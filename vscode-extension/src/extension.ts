@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 export function activate(context: vscode.ExtensionContext) {
   const didChangeEmitter = new vscode.EventEmitter<void>();
+  context.subscriptions.push(didChangeEmitter);
 
   context.subscriptions.push(
     vscode.lm.registerMcpServerDefinitionProvider("planetary-computer-mcp", {

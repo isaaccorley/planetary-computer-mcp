@@ -37,38 +37,7 @@ This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) 
 - **GitHub Copilot Integration**: Works seamlessly with VS Code's Copilot Chat
 - **Real-time Processing**: Auto URL signing and streaming downloads
 
-## Installation
-
-### Option 1: Install from VSIX (Recommended)
-
-1. Download the latest `.vsix` file from the [GitHub Releases](https://github.com/isaaccorley/planetary-computer-mcp/releases)
-2. In VS Code: `Extensions` → `...` → `Install from VSIX...`
-3. Select the downloaded `.vsix` file
-
-## Usage
-
-### Adding the MCP Server
-
-On first install, you'll be prompted to add the MCP server to your settings. You can also:
-
-1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Run `Planetary Computer: Add MCP Server`
-3. Reload VS Code when prompted
-
-This adds the following to your VS Code settings:
-
-```json
-{
-  "servers": {
-    "planetary-computer": {
-      "command": "npx",
-      "args": ["-y", "planetary-computer-mcp"]
-    }
-  }
-}
-```
-
-### Using with GitHub Copilot
+## Tools
 
 Once configured, open Copilot Chat and use these tools:
 
@@ -82,7 +51,9 @@ Once configured, open Copilot Chat and use these tools:
 - **`download_zarr`**: Download spatial/temporal slices from Zarr collections (Daymet, ERA5, TerraClimate)
 - **`render_zarr_preview`**: Create heatmap PNG previews from downloaded Zarr data
 
-### Example Queries
+### Example Usage
+
+Ask your LLM Agent the following in Copilot Chat, Cursor, Claude Code, etc.
 
 ```bash
 Find recent Sentinel-2 imagery over Seattle from June 2024
@@ -96,7 +67,7 @@ Get multispectral bands for vegetation analysis in the Smoky Mountains
 Download NAIP imagery of Miami Airport
 ```
 
-## Supported Data Collections
+## Tested Collections
 
 - **Optical Imagery**: Sentinel-2 L2A, NAIP, Landsat C2 L2, HLS L30/L8
 - **Digital Elevation Models**: Copernicus GLO-30, ALOS DEM

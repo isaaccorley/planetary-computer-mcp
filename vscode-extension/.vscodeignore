@@ -10,4 +10,4 @@ webpack.config.js
 bun.lock
 node_modules/**
 assets/**
-!assets/icon.png
+!images/icon.png

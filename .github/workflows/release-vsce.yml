@@ -24,7 +24,7 @@ jobs:
         if: ${{ inputs.version != '' }}
         working-directory: vscode-extension
         run: |
-          jq '.version = "${{ inputs.version }}"' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "${{ inputs.version }}" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
       - name: Install dependencies
         working-directory: vscode-extension
