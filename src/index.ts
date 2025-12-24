@@ -28,7 +28,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import FileSystemStore from "@zarrita/storage/fs";
 import { createWriteStream } from "fs";
-import { mkdir, readFile, stat, writeFile } from "fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "fs/promises";
 import { fromUrl, writeArrayBuffer } from "geotiff";
 import os from "os";
 import path from "path";
@@ -55,7 +55,6 @@ import {
   inferCollectionFromUrl,
   listBlobFiles,
   PARQUET_COLLECTIONS,
-  RGB_BAND_MAPPING,
   SAR_COLLECTIONS,
   STACCollectionDetail,
 } from "./utils.js";
@@ -63,9 +62,9 @@ import { terrainColormap } from "./visualization-utils.js";
 import { computeDisplayRange, createHeatmapBuffer, loadLocalZarrSlice } from "./zarr-preview.js";
 import { computeArrayStats, findIndexRange, toNumberArray } from "./zarr-utils.js";
 import {
-  getNonOpticalSuggestion,
   getRGBStrategy,
   getTemporalWarning,
+  inferAssetsForCollection,
   selectZarrAsset,
 } from "./collection-utils.js";
 
@@ -104,28 +103,6 @@ interface STACSearchResponse {
     matched: number;
     returned: number;
   };
-}
-
-interface VisualDownloadMetadata {
-  collection: string;
-  item_id: string;
-  datetime: string | null;
-  bbox: [number, number, number, number];
-  output_path: string;
-  output_format: "jpg" | "png";
-  width: number;
-  height: number;
-  file_size_bytes: number;
-  file_size_mb: number;
-  cloud_cover: number | null;
-  max_cloud_cover: number;
-  strategy: string;
-  assets_used: string[];
-  classification_legend_path?: string | null;
-  classes_found?: string[];
-  dem_elevation_range?: { min: number; max: number };
-  colormap_saved?: boolean;
-  notes?: string[];
 }
 
 const STAC_SEARCH_CACHE_TTL_MS = 60 * 1000; // 1 minute
@@ -445,8 +422,7 @@ async function queryParquetGeometries(
   collection: string,
   bbox: [number, number, number, number],
   outputPath: string,
-  outputFormat: "geojson" | "parquet" = "geojson",
-  limit: number = 1000
+  outputFormat: "geojson" | "parquet" = "geojson"
 ): Promise<{ count: number; path: string }> {
   const config = PARQUET_COLLECTIONS[collection];
   if (!config) {
@@ -507,13 +483,12 @@ async function queryParquetGeometries(
       }
 
       // Query with spatial filter - use read_parquet with list of files
-      const urlList = parquetUrls.slice(0, 20).join(", "); // Limit to 20 files for performance
+      const urlList = parquetUrls.join(", "); // Query all available files
 
       countQuery = `
         SELECT COUNT(*) as n FROM (
           SELECT geometry FROM read_parquet([${urlList}])
           WHERE ST_Intersects(ST_GeomFromWKB(geometry), ST_MakeEnvelope(${west}, ${south}, ${east}, ${north}))
-          LIMIT ${limit}
         )
       `;
 
@@ -521,7 +496,6 @@ async function queryParquetGeometries(
         SELECT ST_GeomFromWKB(geometry) as geometry
         FROM read_parquet([${urlList}])
         WHERE ST_Intersects(ST_GeomFromWKB(geometry), ST_MakeEnvelope(${west}, ${south}, ${east}, ${north}))
-        LIMIT ${limit}
       `;
     } else {
       throw new Error(`Unsupported parquet collection: ${collection}`);
@@ -1270,6 +1244,161 @@ async function downloadAndStackBands(
     height: commonHeight,
     bands: bandData.map((b) => b.name),
   };
+}
+
+/**
+ * Generate RGB preview image from STAC item using visualization strategy
+ */
+async function generateRGBPreview(
+  item: any,
+  rgbStrategy: any,
+  outputPath: string,
+  max_pixels?: number,
+  bbox?: [number, number, number, number],
+  itemBbox?: [number, number, number, number],
+  save_colormap?: boolean
+): Promise<void> {
+  let _result: { width: number; height: number } | null = null;
+  let _finalImagePath = outputPath;
+  let _outputFormat: "jpg" | "png" = outputPath.endsWith(".png") ? "png" : "jpg";
+  let legendPath: string | null = null;
+
+  if (rgbStrategy.type === "visual") {
+    // Use visual/TCI asset directly (Sentinel-2)
+    const asset = item.assets?.[rgbStrategy.asset];
+    if (!asset?.href) {
+      throw new Error(`Visual asset not found in item ${item.id}`);
+    }
+
+    const rgbResult = await readRGBFromCOG(asset.href, max_pixels, [0, 1, 2], bbox, itemBbox, true);
+    if (!bufferHasSignal(rgbResult.buffer)) {
+      throw new Error("Visual asset window appears empty (all zeros)");
+    }
+    _result = { width: rgbResult.width, height: rgbResult.height };
+    await sharp(rgbResult.buffer, {
+      raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
+    })
+      .jpeg({ quality: 90 })
+      .toFile(outputPath);
+    _finalImagePath = outputPath;
+    _outputFormat = "jpg";
+  } else if (rgbStrategy.type === "image") {
+    // Use single stacked image asset with specified band indices (NAIP)
+    const asset = item.assets?.[rgbStrategy.asset];
+    if (!asset?.href) {
+      throw new Error(`Image asset not found in item ${item.id}`);
+    }
+
+    const bandIndices = rgbStrategy.bandIndices || [0, 1, 2];
+    const rgbResult = await readRGBFromCOG(
+      asset.href,
+      max_pixels,
+      bandIndices,
+      bbox,
+      itemBbox,
+      rgbStrategy.skipNormalization !== false // default to true for normalization
+    );
+    if (!bufferHasSignal(rgbResult.buffer)) {
+      throw new Error("Image asset window appears empty (all zeros)");
+    }
+    _result = { width: rgbResult.width, height: rgbResult.height };
+    await sharp(rgbResult.buffer, {
+      raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
+    })
+      .jpeg({ quality: 90 })
+      .toFile(outputPath);
+    _finalImagePath = outputPath;
+    _outputFormat = "jpg";
+  } else if (rgbStrategy.type === "bands") {
+    // Stack individual bands (Landsat, NAIP, etc.)
+    const assetNames = [rgbStrategy.assets.red, rgbStrategy.assets.green, rgbStrategy.assets.blue];
+    const assetUrls = assetNames.map((name) => ({
+      name,
+      url: item.assets![name].href,
+    }));
+
+    const tempTifPath = path.join(path.dirname(outputPath), `temp_preview_${Date.now()}.tif`);
+    const stackResult = await downloadAndStackBands(
+      assetUrls,
+      tempTifPath,
+      max_pixels,
+      true // normalize for preview
+    );
+    _result = { width: stackResult.width, height: stackResult.height };
+
+    await sharp(tempTifPath).jpeg({ quality: 90 }).toFile(outputPath);
+
+    // Clean up temp file
+    try {
+      await rm(tempTifPath);
+    } catch {
+      // ignore cleanup errors
+    }
+  } else if (rgbStrategy.type === "classified") {
+    // Apply classification colormap
+    const rgbResult = await readClassifiedWithColormap(
+      item.assets![rgbStrategy.asset].href,
+      rgbStrategy.classInfo,
+      max_pixels,
+      bbox,
+      itemBbox
+    );
+    _result = { width: rgbResult.width, height: rgbResult.height };
+
+    await sharp(rgbResult.buffer, {
+      raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
+    })
+      .png()
+      .toFile(outputPath);
+    _outputFormat = "png";
+
+    // Save colormap legend if requested
+    if (save_colormap) {
+      legendPath = path.join(
+        path.dirname(outputPath),
+        `${path.basename(outputPath, ".png")}_legend.json`
+      );
+      const legend = {
+        classes: rgbStrategy.classInfo.colors.map((c: ClassificationColor) => ({
+          value: c.value,
+          description: c.description,
+          color: [c.r, c.g, c.b],
+        })),
+      };
+      await writeFile(legendPath, JSON.stringify(legend, null, 2));
+    }
+  } else if (rgbStrategy.type === "dem") {
+    // Apply DEM colormap (terrain colors)
+    const rgbResult = await readDEMWithColormap(
+      item.assets![rgbStrategy.asset].href,
+      max_pixels,
+      bbox
+    );
+    _result = { width: rgbResult.width, height: rgbResult.height };
+
+    await sharp(rgbResult.buffer, {
+      raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
+    })
+      .jpeg({ quality: 90 })
+      .toFile(outputPath);
+    _outputFormat = "jpg";
+  } else if (rgbStrategy.type === "sar") {
+    // Apply SAR false color
+    const rgbResult = await readSARFalseColor(
+      item.assets![rgbStrategy.assets.vv].href,
+      item.assets![rgbStrategy.assets.vh]?.href,
+      max_pixels,
+      bbox
+    );
+    _result = { width: rgbResult.width, height: rgbResult.height };
+
+    await sharp(rgbResult.buffer, {
+      raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
+    })
+      .jpeg({ quality: 90 })
+      .toFile(outputPath);
+    _outputFormat = "jpg";
+  }
 }
 
 /**
@@ -2289,7 +2418,7 @@ const STAC_SEARCH_TOOL: Tool = {
 const GET_COLLECTIONS_TOOL: Tool = {
   name: "get_collections",
   description:
-    "Get information about STAC collections on the Microsoft Planetary Computer (126+ collections available). If collection_id is provided, returns detailed info including assets, resolutions, and bands. Use this to discover asset names for download_multispectral.\n\nPopular collections: sentinel-2-l2a, landsat-c2-l2, naip, cop-dem-glo-30, sentinel-1-rtc, modis-09A1-061.",
+    "Get information about STAC collections on the Microsoft Planetary Computer (126+ collections available). If collection_id is provided, returns detailed info including assets, resolutions, and bands. Use this to discover asset names for download_raster.\n\nPopular collections: sentinel-2-l2a, landsat-c2-l2, naip, cop-dem-glo-30, sentinel-1-rtc, modis-09A1-061.",
   inputSchema: {
     type: "object",
     properties: {
@@ -2314,115 +2443,17 @@ const GET_COLLECTIONS_TOOL: Tool = {
   },
 };
 
-// Define the download asset tool
-const DOWNLOAD_ASSET_TOOL: Tool = {
-  name: "download_asset",
+// Tool: download_raster - unified raster data download with auto-preview
+const DOWNLOAD_RASTER_TOOL: Tool = {
+  name: "download_raster",
   description:
-    "Download a small spatial subset from a GeoTIFF/COG asset using HTTP range requests (512x512 pixels by default from center). For non-COG files, downloads the entire file. Automatically retrieves SAS tokens if needed. Files are saved to ~/Downloads/planetary-computer/ by default.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      asset_url: {
-        type: "string",
-        description:
-          "The URL (href) of the STAC asset to download. This can be obtained from the assets in a STAC item returned by search_stac.",
-      },
-      output_filename: {
-        type: "string",
-        description:
-          "Optional filename for the downloaded file. If not provided, uses the last part of the URL.",
-      },
-      output_directory: {
-        type: "string",
-        description: "Optional output directory path. Defaults to ~/Downloads/planetary-computer/",
-      },
-      window: {
-        type: "object",
-        description:
-          "Optional spatial window to download (pixel coordinates). If not provided, downloads a 512x512 window from the center.",
-        properties: {
-          minX: { type: "number", description: "Minimum X coordinate (left)" },
-          minY: { type: "number", description: "Minimum Y coordinate (top)" },
-          maxX: { type: "number", description: "Maximum X coordinate (right)" },
-          maxY: { type: "number", description: "Maximum Y coordinate (bottom)" },
-        },
-      },
-      maxSize: {
-        type: "number",
-        description: "Maximum size for default window (default: 512 pixels)",
-        default: 512,
-      },
-    },
-    required: ["asset_url"],
-  },
-};
-
-// Tool: download_visual - smart RGB extraction for viewing
-const DOWNLOAD_VISUAL_TOOL: Tool = {
-  name: "download_visual",
-  description:
-    "Download a visual image from satellite collections for viewing. Outputs JPG for optical/DEM, PNG for classified data.\n\nSupported:\n- Optical: sentinel-2-l2a, naip, landsat-c2-l2\n- DEM: cop-dem-glo-30 (terrain colormap)\n- Land cover: esa-worldcover, io-lulc-annual-v02 (categorical colormap from STAC metadata)\n- Burn severity: mtbs (categorical colormap)\n\nNOT for: SAR (radar) - use download_multispectral for those.",
+    "Download satellite/raster data from Planetary Computer collections. Downloads requested bands as GeoTIFF and auto-generates an RGB preview image.\n\nSupported collections:\n- Optical: sentinel-2-l2a, naip, landsat-c2-l2, hls2-l30/s30\n- DEM: cop-dem-glo-30, alos-dem\n- Land Cover: esa-worldcover, io-lulc-annual-v02, mtbs\n- SAR: sentinel-1-rtc\n\nFor vector data (buildings), use download_geometries instead.\nFor Zarr data (climate/weather), use download_zarr instead.",
   inputSchema: {
     type: "object",
     properties: {
       collection: {
         type: "string",
-        description:
-          "STAC collection ID (e.g., 'sentinel-2-l2a', 'naip', 'cop-dem-glo-30', 'esa-worldcover', 'io-lulc-annual-v02', 'mtbs')",
-      },
-      bbox: {
-        type: "array",
-        description: "Geographic bounding box as [west, south, east, north] in WGS84 (EPSG:4326)",
-        items: { type: "number" },
-        minItems: 4,
-        maxItems: 4,
-      },
-      datetime: {
-        type: "string",
-        description:
-          "Time range in ISO8601 format. Example: '2024-01-01T00:00:00Z/2024-06-30T23:59:59Z'",
-      },
-      max_cloud_cover: {
-        type: "number",
-        description: "Maximum cloud cover percentage (0-100). Default: 20.",
-        default: 20,
-      },
-      max_pixels: {
-        type: "number",
-        description:
-          "Optional maximum dimension in pixels. If not set, downloads at native resolution for the bbox. Set to limit file size (e.g., 1024, 2048).",
-      },
-      output_filename: {
-        type: "string",
-        description:
-          "Optional output filename (will have .jpg or .png extension depending on data type)",
-      },
-      output_directory: {
-        type: "string",
-        description: "Optional output directory. Defaults to ~/Downloads/planetary-computer/",
-      },
-      save_colormap: {
-        type: "boolean",
-        description:
-          "For classified data (land cover, burn severity), save a JSON file with the colormap legend alongside the image. Default: false.",
-        default: false,
-      },
-    },
-    required: ["collection", "bbox", "datetime"],
-  },
-};
-
-// Tool: download_multispectral - user-defined bands for analysis
-const DOWNLOAD_MULTISPECTRAL_TOOL: Tool = {
-  name: "download_multispectral",
-  description:
-    "Download specific bands/assets from any satellite collection into a GeoTIFF. Use for analysis requiring raw data.\n\nAsset examples by collection:\n- sentinel-2-l2a: B02 (blue), B03 (green), B04 (red), B08 (NIR)\n- landsat-c2-l2: blue, green, red, nir08, swir16\n- naip: image (4-band RGBIR)\n- cop-dem-glo-30: data (elevation)\n- sentinel-1-rtc: vv, vh (SAR polarizations)\n\nUse get_collections with collection_id to see all available assets.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      collection: {
-        type: "string",
-        description: "STAC collection ID (e.g., 'sentinel-2-l2a', 'landsat-c2-l2', 'naip')",
+        description: "STAC collection ID",
       },
       bbox: {
         type: "array",
@@ -2439,7 +2470,7 @@ const DOWNLOAD_MULTISPECTRAL_TOOL: Tool = {
       assets: {
         type: "array",
         description:
-          "Asset names to download and stack. Examples: ['B04', 'B08'] for Sentinel-2 Red+NIR, ['red', 'nir08'] for Landsat, ['image'] for NAIP (full RGBIR).",
+          "Asset names to download. Optional - will auto-select appropriate bands if omitted.",
         items: { type: "string" },
       },
       max_cloud_cover: {
@@ -2452,16 +2483,27 @@ const DOWNLOAD_MULTISPECTRAL_TOOL: Tool = {
         description:
           "Optional maximum dimension in pixels. If not set, downloads at native resolution for the bbox. Set to limit file size (e.g., 1024, 2048).",
       },
+      generate_preview: {
+        type: "boolean",
+        description: "Generate RGB preview image alongside GeoTIFF. Default: true.",
+        default: true,
+      },
+      save_colormap: {
+        type: "boolean",
+        description:
+          "For classified data, save a JSON file with the colormap legend. Default: false.",
+        default: false,
+      },
       output_filename: {
         type: "string",
-        description: "Optional output filename (will have .tif extension)",
+        description: "Optional output filename (without extension)",
       },
       output_directory: {
         type: "string",
         description: "Optional output directory. Defaults to ~/Downloads/planetary-computer/",
       },
     },
-    required: ["collection", "bbox", "datetime", "assets"],
+    required: ["collection", "bbox", "datetime"],
   },
 };
 
@@ -2469,7 +2511,7 @@ const DOWNLOAD_MULTISPECTRAL_TOOL: Tool = {
 const DOWNLOAD_GEOMETRIES_TOOL: Tool = {
   name: "download_geometries",
   description:
-    "Download Microsoft Building Footprints from Planetary Computer with spatial filtering. Queries remote parquet files and exports building polygons intersecting your area of interest.\n\nSupported collections:\n- ms-buildings: Microsoft Building Footprints (global coverage, ~10s query time)\n\nOutputs GeoJSON (default) or Parquet format.",
+    "Download vector/building data from Planetary Computer with spatial filtering.\n\nONLY for vector data: ms-buildings.\n\nDo NOT use for satellite imagery like NAIP, Sentinel, Landsat, etc. - use download_raster instead.\n\nQueries remote parquet files and exports building polygons intersecting your area of interest.\n\nOutputs GeoJSON (default) or Parquet format.\n\nNOTE: Returns ALL geometries intersecting the bbox - no artificial limits.",
   inputSchema: {
     type: "object",
     properties: {
@@ -2488,11 +2530,6 @@ const DOWNLOAD_GEOMETRIES_TOOL: Tool = {
         type: "string",
         description:
           "Time range in ISO8601 format. Example: '2024-01-01T00:00:00Z/2024-06-30T23:59:59Z'. Some collections (like ms-buildings) are static.",
-      },
-      limit: {
-        type: "number",
-        description: "Maximum number of geometries to return. Default: 1000.",
-        default: 1000,
       },
       output_format: {
         type: "string",
@@ -2517,7 +2554,7 @@ const DOWNLOAD_GEOMETRIES_TOOL: Tool = {
 const DOWNLOAD_ZARR_TOOL: Tool = {
   name: "download_zarr",
   description:
-    "Download a spatial and temporal slice from a Zarr-based collection (e.g., Daymet, ERA5, TerraClimate). Slices the multidimensional array based on AOI and time-range and saves locally as a Zarr group.",
+    "Download spatial/temporal slices from multidimensional climate/weather data.\n\nUse for: daymet-daily-*, daymet-monthly-*, era5-pds, terraclimate.\n\nDo NOT use for satellite imagery or vector data.\n\nSlices the multidimensional array based on AOI and time-range and saves locally as a Zarr group.",
   inputSchema: {
     type: "object",
     properties: {
@@ -2628,9 +2665,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       STAC_SEARCH_TOOL,
       GET_COLLECTIONS_TOOL,
       DESCRIBE_COLLECTION_TOOL,
-      DOWNLOAD_VISUAL_TOOL,
-      DOWNLOAD_MULTISPECTRAL_TOOL,
-      DOWNLOAD_ASSET_TOOL,
+      DOWNLOAD_RASTER_TOOL,
       DOWNLOAD_GEOMETRIES_TOOL,
       DOWNLOAD_ZARR_TOOL,
       RENDER_ZARR_PREVIEW_TOOL,
@@ -2693,12 +2728,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             : "optical";
       const recommendedTools =
         category === "dem"
-          ? ["download_multispectral (assets=['data'])", "download_visual"]
+          ? ["download_raster (assets=['data'])"]
           : category === "sar"
-            ? ["download_multispectral (assets=['vv','vh'])", "download_visual"]
+            ? ["download_raster (assets=['vv','vh'])"]
             : category === "classified"
-              ? ["download_visual (save_colormap=true)", "download_multispectral for raw values"]
-              : ["download_visual", "download_multispectral"];
+              ? ["download_raster (save_colormap=true)"]
+              : ["download_raster"];
       const rgbStrategy = getRGBStrategy(collection, itemAssets);
       const assetDetails = Object.entries(itemAssets).map(([name, value]) => {
         const primaryBand =
@@ -2868,478 +2903,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  // Handler for download_visual
-  if (request.params.name === "download_visual") {
-    const {
-      collection,
-      bbox,
-      datetime,
-      max_cloud_cover = 20,
-      max_pixels,
-      output_filename,
-      output_directory,
-      save_colormap = false,
-    } = request.params.arguments as {
-      collection: string;
-      bbox: [number, number, number, number];
-      datetime: string;
-      max_cloud_cover?: number;
-      max_pixels?: number;
-      output_filename?: string;
-      output_directory?: string;
-      save_colormap?: boolean;
-    };
-
-    try {
-      notifyProgress(
-        `Searching ${collection} for ${datetime} within bbox [${bbox.join(", ")}]`,
-        "info"
-      );
-      // Get collection details to determine RGB strategy
-      const collectionDetails = await getCollectionDetails(collection);
-      const itemAssets = collectionDetails.itemAssets || {};
-      let rgbStrategy = getRGBStrategy(collection, itemAssets);
-
-      // Search for imagery
-      const searchParams: STACSearchParams = {
-        collections: [collection],
-        bbox,
-        datetime,
-        limit: 1,
-        sortby: [{ field: "eo:cloud_cover", direction: "asc" }],
-      };
-
-      const searchResults = await searchSTAC(searchParams);
-
-      if (searchResults.features.length === 0) {
-        // Check for temporal info to provide helpful suggestion
-        const temporalWarning = getTemporalWarning(collection, datetime);
-        let errorMsg = `No imagery found for collection ${collection} in the given AOI and time range.`;
-        if (temporalWarning) {
-          errorMsg += "\n\n" + temporalWarning;
-        }
-        throw new Error(errorMsg);
-      }
-
-      const filteredItems = searchResults.features.filter((item) => {
-        const cloudCover = item.properties?.["eo:cloud_cover"];
-        return cloudCover === undefined || cloudCover <= max_cloud_cover;
-      });
-
-      if (filteredItems.length === 0) {
-        const bestCloud = searchResults.features[0]?.properties?.["eo:cloud_cover"];
-        const cloudMsg =
-          bestCloud !== undefined
-            ? `Closest available cloud cover: ${bestCloud.toFixed(2)}%`
-            : "This collection does not report cloud cover.";
-        throw new Error(`No images found with cloud cover <= ${max_cloud_cover}%. ${cloudMsg}`);
-      }
-
-      const bestItem = filteredItems[0];
-      const selectedCloud = bestItem.properties?.["eo:cloud_cover"];
-      notifyProgress(
-        `Selected item ${bestItem.id} (cloud cover: ${selectedCloud?.toFixed(2) ?? "N/A"}%)`,
-        "info"
-      );
-
-      // Re-determine RGB strategy using actual item assets (needed for classified collections)
-      if (!rgbStrategy || rgbStrategy.type === "classified") {
-        rgbStrategy = getRGBStrategy(collection, bestItem.assets || {});
-      }
-
-      if (!rgbStrategy) {
-        // Provide helpful suggestions for non-optical collections
-        const suggestions = getNonOpticalSuggestion(collection);
-        throw new Error(
-          `Cannot determine RGB bands for collection '${collection}'. ${suggestions}`
-        );
-      }
-
-      // Get item bbox for geographic cropping
-      let itemBbox: [number, number, number, number] | undefined;
-      if (bestItem.bbox) {
-        itemBbox = bestItem.bbox as [number, number, number, number];
-      } else if (bestItem.geometry?.type === "Polygon" && bestItem.geometry.coordinates?.[0]) {
-        const coords = bestItem.geometry.coordinates[0] as number[][];
-        const lons = coords.map((c) => c[0]);
-        const lats = coords.map((c) => c[1]);
-        itemBbox = [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
-      }
-
-      // Determine output path
-      const defaultDir = path.join(os.homedir(), "Downloads", "planetary-computer");
-      const targetDir = output_directory || defaultDir;
-      const filename = output_filename || `${bestItem.id}_visual.jpg`;
-      const outputPath = path.join(
-        targetDir,
-        filename.endsWith(".jpg") || filename.endsWith(".png") ? filename : `${filename}.jpg`
-      );
-
-      await mkdir(targetDir, { recursive: true });
-
-      let result: { width: number; height: number } | null = null;
-      let finalImagePath = outputPath;
-      let outputFormat: "jpg" | "png" = outputPath.endsWith(".png") ? "png" : "jpg";
-      let legendPath: string | null = null;
-      let classesFound: string[] | undefined;
-      let demElevationRange: { min: number; max: number } | undefined;
-      let assetsUsed: string[] = [];
-      const metadataNotes: string[] = [];
-
-      if (rgbStrategy.type === "visual") {
-        // Use visual/TCI asset directly (Sentinel-2)
-        const asset = bestItem.assets?.[rgbStrategy.asset];
-        if (!asset?.href) {
-          throw new Error(`Visual asset not found in item ${bestItem.id}`);
-        }
-
-        notifyProgress("Rendering quick-look visual asset", "info");
-        let visualSucceeded = false;
-        let visualError: Error | null = null;
-
-        const tryVisualSampling = async () => {
-          const rgbResult = await readRGBFromCOG(
-            asset.href,
-            max_pixels,
-            [0, 1, 2],
-            bbox,
-            itemBbox,
-            true
-          );
-          if (!bufferHasSignal(rgbResult.buffer)) {
-            throw new Error("Visual asset window appears empty (all zeros)");
-          }
-          result = { width: rgbResult.width, height: rgbResult.height };
-          await sharp(rgbResult.buffer, {
-            raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
-          })
-            .jpeg({ quality: 90 })
-            .toFile(outputPath);
-          finalImagePath = outputPath;
-          outputFormat = "jpg";
-          assetsUsed = [rgbStrategy.asset];
-          visualSucceeded = true;
-        };
-
-        try {
-          await tryVisualSampling();
-        } catch (visualErr) {
-          visualError = visualErr instanceof Error ? visualErr : new Error(String(visualErr));
-          console.error("visual asset sampling failed", visualError);
-        }
-
-        if (!visualSucceeded) {
-          const mapping = RGB_BAND_MAPPING[collection];
-          const assetNames =
-            mapping &&
-            bestItem.assets?.[mapping.red] &&
-            bestItem.assets?.[mapping.green] &&
-            bestItem.assets?.[mapping.blue]
-              ? [mapping.red, mapping.green, mapping.blue]
-              : null;
-
-          if (assetNames) {
-            metadataNotes.push(
-              "Visual asset failed, stacked calibrated red/green/blue bands instead."
-            );
-            const tempTifPath = path.join(targetDir, `temp_${Date.now()}.tif`);
-            const stackResult = await downloadAndStackBands(
-              assetNames.map((name) => ({
-                name,
-                url: bestItem.assets![name].href,
-              })),
-              tempTifPath,
-              max_pixels,
-              true,
-              bbox
-            );
-            result = { width: stackResult.width, height: stackResult.height };
-
-            await sharp(tempTifPath, { failOn: "none" })
-              .removeAlpha()
-              .toColourspace("srgb")
-              .jpeg({ quality: 90 })
-              .toFile(outputPath);
-            const { unlink } = await import("fs/promises");
-            await unlink(tempTifPath);
-            finalImagePath = outputPath;
-            outputFormat = "jpg";
-            assetsUsed = assetNames;
-            visualSucceeded = true;
-          } else {
-            throw visualError ?? new Error("Visual asset could not be rendered");
-          }
-        }
-      } else if (rgbStrategy.type === "image") {
-        // Use stacked image asset (NAIP, ASTER VNIR) - extract RGB bands directly from COG
-        const asset = bestItem.assets?.[rgbStrategy.asset];
-        if (!asset?.href) {
-          throw new Error(`Image asset not found in item ${bestItem.id}`);
-        }
-
-        notifyProgress("Extracting RGB preview from multi-band COG", "info");
-        // Default bands 0, 1, 2 for RGB; use bandIndices if specified
-        // Pass bbox for geographic cropping and skip normalization for uint8 data
-        const bandIndices = rgbStrategy.bandIndices || [0, 1, 2];
-        const rgbResult = await readRGBFromCOG(
-          asset.href,
-          max_pixels,
-          bandIndices,
-          bbox,
-          itemBbox,
-          rgbStrategy.skipNormalization
-        );
-        result = { width: rgbResult.width, height: rgbResult.height };
-
-        // Convert to JPG
-        await sharp(rgbResult.buffer, {
-          raw: { width: rgbResult.width, height: rgbResult.height, channels: 3 },
-        })
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
-        finalImagePath = outputPath;
-        outputFormat = "jpg";
-        assetsUsed = [rgbStrategy.asset];
-      } else if (rgbStrategy.type === "bands") {
-        notifyProgress("Stacking dedicated R/G/B bands for composite", "info");
-        const { red, green, blue } = rgbStrategy.assets;
-        const assetUrls: { name: string; url: string }[] = [];
-
-        for (const [name, assetName] of [
-          ["red", red],
-          ["green", green],
-          ["blue", blue],
-        ]) {
-          const asset = bestItem.assets?.[assetName];
-          if (!asset?.href) {
-            throw new Error(`Band '${assetName}' not found in item ${bestItem.id}`);
-          }
-          assetUrls.push({ name, url: asset.href });
-        }
-
-        // Stack bands with normalization to uint8
-        const tempTifPath = path.join(targetDir, `temp_${Date.now()}.tif`);
-        const stackResult = await downloadAndStackBands(
-          assetUrls,
-          tempTifPath,
-          max_pixels,
-          rgbStrategy.needsNormalization,
-          bbox // Pass bbox for geographic cropping
-        );
-        result = { width: stackResult.width, height: stackResult.height };
-
-        // Convert to JPG
-        await sharp(tempTifPath, { failOn: "none" })
-          .removeAlpha()
-          .toColourspace("srgb")
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
-        const { unlink } = await import("fs/promises");
-        await unlink(tempTifPath);
-        finalImagePath = outputPath;
-        outputFormat = "jpg";
-        assetsUsed = [red, green, blue];
-      } else if (rgbStrategy.type === "dem") {
-        // DEM elevation data - apply terrain colormap
-        const asset = bestItem.assets?.[rgbStrategy.asset];
-        if (!asset?.href) {
-          throw new Error(`DEM data asset not found in item ${bestItem.id}`);
-        }
-
-        notifyProgress("Rendering DEM terrain visualization", "info");
-        const demResult = await readDEMWithColormap(asset.href, max_pixels, bbox);
-        result = { width: demResult.width, height: demResult.height };
-
-        // Convert to JPG
-        await sharp(demResult.buffer, {
-          raw: { width: demResult.width, height: demResult.height, channels: 3 },
-        })
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
-        finalImagePath = outputPath;
-        outputFormat = "jpg";
-        demElevationRange = { min: demResult.minElev, max: demResult.maxElev };
-        metadataNotes.push("Terrain-colormap DEM visualization");
-        assetsUsed = [rgbStrategy.asset];
-      } else if (rgbStrategy.type === "classified") {
-        // Classified/categorical data - apply colormap from STAC metadata
-        const { classInfo } = rgbStrategy;
-        const asset = bestItem.assets?.[classInfo.assetName];
-        if (!asset?.href) {
-          throw new Error(
-            `Classification asset '${classInfo.assetName}' not found in item ${bestItem.id}`
-          );
-        }
-
-        notifyProgress("Rendering classified data with legend", "info");
-        const classResult = await readClassifiedWithColormap(
-          asset.href,
-          classInfo,
-          max_pixels,
-          bbox,
-          itemBbox
-        );
-        result = { width: classResult.width, height: classResult.height };
-
-        // Convert to PNG for better quality with discrete colors
-        const pngPath = outputPath.replace(/\.jpg$/, ".png");
-        await sharp(classResult.buffer, {
-          raw: { width: classResult.width, height: classResult.height, channels: 3 },
-        })
-          .png()
-          .toFile(pngPath);
-        finalImagePath = pngPath;
-        outputFormat = "png";
-        classesFound = classResult.classesFound;
-        assetsUsed = [classInfo.assetName];
-
-        if (save_colormap) {
-          legendPath = pngPath.replace(/\.png$/, "_legend.json");
-          const legendData = {
-            collection: collection,
-            item_id: bestItem.id,
-            datetime: bestItem.properties?.datetime || null,
-            bbox: bbox,
-            image_dimensions: { width: result.width, height: result.height },
-            classes_in_image: classResult.classesFound,
-            colormap: classInfo.colors.map((c) => ({
-              value: c.value,
-              description: c.description,
-              color: {
-                r: c.r,
-                g: c.g,
-                b: c.b,
-                hex: `#${c.r.toString(16).padStart(2, "0")}${c.g.toString(16).padStart(2, "0")}${c.b.toString(16).padStart(2, "0")}`,
-              },
-            })),
-            nodata_value: classInfo.noDataValue ?? null,
-          };
-          await writeFile(legendPath, JSON.stringify(legendData, null, 2));
-        }
-      } else if (rgbStrategy.type === "sar") {
-        // SAR radar data - create false color composite from VV/VH
-        const vvAsset = bestItem.assets?.[rgbStrategy.vv];
-        const vhAsset = bestItem.assets?.[rgbStrategy.vh];
-        if (!vvAsset?.href || !vhAsset?.href) {
-          throw new Error(`SAR VV/VH assets not found in item ${bestItem.id}`);
-        }
-
-        notifyProgress("Rendering SAR false-color composite", "info");
-        const sarResult = await readSARFalseColor(vvAsset.href, vhAsset.href, max_pixels, bbox);
-        result = { width: sarResult.width, height: sarResult.height };
-
-        // Convert to JPG
-        await sharp(sarResult.buffer, {
-          raw: { width: sarResult.width, height: sarResult.height, channels: 3 },
-        })
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
-        finalImagePath = outputPath;
-        outputFormat = "jpg";
-        assetsUsed = [rgbStrategy.vv, rgbStrategy.vh];
-        metadataNotes.push("False color SAR composite (R=VV, G=VH, B=VV/VH ratio)");
-      } else {
-        throw new Error(`Unsupported RGB strategy type`);
-      }
-
-      if (!result) {
-        throw new Error("Failed to render visual preview for requested item");
-      }
-
-      const finalStats = await stat(finalImagePath);
-
-      notifyProgress(`Finished writing visual image to ${outputPath}`, "info");
-
-      let message = `Successfully downloaded visual image to: ${outputPath}\n`;
-      message += `File size: ${(finalStats.size / 1024).toFixed(2)} KB\n`;
-      message += `Dimensions: ${result.width}x${result.height} pixels\n`;
-      message += `Item: ${bestItem.id}\n`;
-      message += `Datetime: ${bestItem.properties?.datetime || "N/A"}\n`;
-      message += `Cloud cover: ${bestItem.properties?.["eo:cloud_cover"]?.toFixed(2) || "N/A"}%`;
-      if (demElevationRange) {
-        message += `\nElevation range: ${demElevationRange.min.toFixed(0)}m to ${demElevationRange.max.toFixed(0)}m`;
-      }
-      if (legendPath) {
-        message += `\nLegend JSON: ${legendPath}`;
-      }
-      if (classesFound && classesFound.length > 0) {
-        const preview = classesFound.slice(0, 10).map((name) => `  • ${name}`);
-        message += `\nClasses found in image:\n${preview.join("\n")}`;
-        if (classesFound.length > 10) {
-          message += `\n  ... and ${classesFound.length - 10} more classes`;
-        }
-      }
-      if (rgbStrategy.type === "sar") {
-        message += `\nFalse color interpretation: Cyan=water, Pink/Red=urban, Green=vegetation`;
-      }
-
-      const metadata: VisualDownloadMetadata = {
-        collection,
-        item_id: bestItem.id,
-        datetime: bestItem.properties?.datetime || null,
-        bbox,
-        output_path: finalImagePath,
-        output_format: outputFormat,
-        width: result.width,
-        height: result.height,
-        file_size_bytes: finalStats.size,
-        file_size_mb: Number((finalStats.size / 1024 / 1024).toFixed(3)),
-        cloud_cover: bestItem.properties?.["eo:cloud_cover"] ?? null,
-        max_cloud_cover,
-        strategy: rgbStrategy.type,
-        assets_used: assetsUsed,
-        classification_legend_path: legendPath,
-        classes_found: classesFound,
-        dem_elevation_range: demElevationRange,
-      };
-      if (legendPath) {
-        metadata.colormap_saved = true;
-      }
-      if (metadataNotes.length > 0) {
-        metadata.notes = metadataNotes;
-      }
-
-      return {
-        content: [
-          { type: "text", text: message },
-          {
-            type: "text",
-            text: `JSON metadata:\n${JSON.stringify(metadata, null, 2)}`,
-          },
-        ],
-      };
-    } catch (error) {
-      const err = error as Error & { cause?: unknown };
-      const baseMessage = err instanceof Error ? err.message : String(err);
-      const causeDetails =
-        err && typeof err === "object" && "cause" in err
-          ? err.cause instanceof Error
-            ? err.cause.message
-            : err.cause
-          : "";
-      const causeSuffix =
-        typeof causeDetails === "string" && causeDetails.length > 0
-          ? ` | cause: ${causeDetails}`
-          : "";
-      const bboxStr = Array.isArray(bbox) ? bbox.join(", ") : "N/A";
-      console.error(
-        `[download_visual] collection=${collection} bbox=${bboxStr} datetime=${datetime}`,
-        err
-      );
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error downloading visual for ${collection} (bbox=${bboxStr}, datetime=${datetime}): ${baseMessage}${causeSuffix}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  // Handler for download_multispectral
-  if (request.params.name === "download_multispectral") {
+  // Handler for download_raster
+  // Handler for download_raster
+  if (request.params.name === "download_raster") {
     const {
       collection,
       bbox,
@@ -3347,15 +2913,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       assets,
       max_cloud_cover = 20,
       max_pixels,
+      generate_preview = true,
+      save_colormap = false,
       output_filename,
       output_directory,
     } = request.params.arguments as {
       collection: string;
       bbox: [number, number, number, number];
       datetime: string;
-      assets: string[];
+      assets?: string[];
       max_cloud_cover?: number;
       max_pixels?: number;
+      generate_preview?: boolean;
+      save_colormap?: boolean;
       output_filename?: string;
       output_directory?: string;
     };
@@ -3407,11 +2977,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         "info"
       );
 
+      // Auto-infer assets if not provided
+      let inferredAssets: string[];
+      if (!assets || assets.length === 0) {
+        inferredAssets = inferAssetsForCollection(collection, bestItem.assets || {});
+        if (inferredAssets.length === 0) {
+          const availableAssets = Object.keys(bestItem.assets || {}).join(", ");
+          throw new Error(
+            `Could not infer appropriate assets for collection '${collection}'. Available assets: ${availableAssets}`
+          );
+        }
+        notifyProgress(`Auto-selected assets: ${inferredAssets.join(", ")}`, "info");
+      } else {
+        inferredAssets = assets;
+      }
+
       // Validate all requested assets exist
       const assetUrls: { name: string; url: string }[] = [];
       const missingAssets: string[] = [];
 
-      for (const assetName of assets) {
+      for (const assetName of inferredAssets) {
         const asset = bestItem.assets?.[assetName];
         if (asset?.href) {
           assetUrls.push({ name: assetName, url: asset.href });
@@ -3428,7 +3013,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Determine output path
       const defaultDir = path.join(os.homedir(), "Downloads", "planetary-computer");
       const targetDir = output_directory || defaultDir;
-      const bandLabel = assets.length === 1 ? assets[0] : `${assets.length}bands`;
+      const bandLabel =
+        inferredAssets.length === 1 ? inferredAssets[0] : `${inferredAssets.length}bands`;
       const filename = output_filename || `${bestItem.id}_${bandLabel}.tif`;
       const outputPath = path.join(
         targetDir,
@@ -3462,6 +3048,55 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const finalStats = await stat(outputPath);
       notifyProgress(`Finished writing multispectral image to ${outputPath}`, "info");
 
+      // Generate RGB preview if requested
+      let previewPath: string | null = null;
+      let legendPath: string | null = null;
+      if (generate_preview) {
+        try {
+          notifyProgress("Generating RGB preview image", "info");
+
+          // Get collection details to determine RGB strategy
+          const collectionDetails = await getCollectionDetails(collection);
+          const _itemAssets = collectionDetails.itemAssets || {};
+          let rgbStrategy = getRGBStrategy(collection, bestItem.assets || {});
+
+          // Re-determine RGB strategy using actual item assets
+          if (!rgbStrategy || rgbStrategy.type === "classified") {
+            rgbStrategy = getRGBStrategy(collection, bestItem.assets || {});
+          }
+
+          if (rgbStrategy) {
+            // Determine preview output path
+            const previewFilename = output_filename
+              ? `${output_filename}_preview.jpg`
+              : `${bestItem.id}_preview.jpg`;
+            previewPath = path.join(targetDir, previewFilename);
+
+            // Generate preview using the same logic as download_visual
+            await generateRGBPreview(
+              bestItem,
+              rgbStrategy,
+              previewPath,
+              max_pixels,
+              bbox,
+              bestItem.bbox as [number, number, number, number],
+              save_colormap
+            );
+
+            if (save_colormap && rgbStrategy.type === "classified") {
+              legendPath = path.join(
+                targetDir,
+                `${path.basename(previewPath, ".jpg")}_legend.json`
+              );
+            }
+          } else {
+            notifyProgress("Could not determine RGB strategy for preview generation", "warn");
+          }
+        } catch (previewError) {
+          notifyProgress(`Preview generation failed: ${previewError}`, "warn");
+        }
+      }
+
       let message = `Successfully downloaded to: ${outputPath}\n`;
       message += `File size: ${(finalStats.size / 1024).toFixed(2)} KB\n`;
       message += `Dimensions: ${result.width}x${result.height} pixels\n`;
@@ -3469,6 +3104,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       message += `Item: ${bestItem.id}\n`;
       message += `Datetime: ${bestItem.properties?.datetime || "N/A"}\n`;
       message += `Cloud cover: ${bestItem.properties?.["eo:cloud_cover"]?.toFixed(2) || "N/A"}%`;
+
+      if (previewPath) {
+        try {
+          const previewStats = await stat(previewPath);
+          message += `\nRGB Preview: ${previewPath} (${(previewStats.size / 1024).toFixed(2)} KB)`;
+        } catch {
+          // Preview file doesn't exist, skip it
+        }
+      }
+
+      if (legendPath) {
+        message += `\nLegend: ${legendPath}`;
+      }
 
       if (missingAssets.length > 0) {
         message += `\nWarning: Assets not found: ${missingAssets.join(", ")}`;
@@ -3552,65 +3200,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  if (request.params.name === "download_asset") {
-    const { asset_url, output_filename, output_directory, window, maxSize } = request.params
-      .arguments as {
-      asset_url: string;
-      output_filename?: string;
-      output_directory?: string;
-      window?: { minX: number; minY: number; maxX: number; maxY: number };
-      maxSize?: number;
-    };
-
-    try {
-      // Determine output path
-      const defaultDir = path.join(os.homedir(), "Downloads", "planetary-computer");
-      const targetDir = output_directory || defaultDir;
-
-      // Extract filename from URL if not provided
-      const urlParts = asset_url.split("/");
-      const urlFilename = urlParts[urlParts.length - 1].split("?")[0];
-      const filename = output_filename || urlFilename;
-
-      const outputPath = path.join(targetDir, filename);
-
-      // Download the asset
-      const result = await downloadAsset(asset_url, outputPath, window, maxSize);
-
-      let message = `Successfully downloaded asset to: ${result.path}\nFile size: ${(result.size / 1024 / 1024).toFixed(2)} MB`;
-      if (result.width && result.height) {
-        message += `\nWindow size: ${result.width}x${result.height} pixels`;
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: message,
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error downloading asset: ${errorMessage}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
   // Handler for download_geometries
   if (request.params.name === "download_geometries") {
     const {
       collection,
       bbox,
       datetime,
-      limit = 1000,
       output_format = "geojson",
       output_filename,
       output_directory,
@@ -3618,7 +3213,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       collection: string;
       bbox: [number, number, number, number];
       datetime?: string;
-      limit?: number;
       output_format?: "geojson" | "parquet";
       output_filename?: string;
       output_directory?: string;
@@ -3639,13 +3233,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       );
 
       // Query and export geometries
-      const result = await queryParquetGeometries(
-        collection,
-        bbox,
-        outputPath,
-        output_format,
-        limit
-      );
+      const result = await queryParquetGeometries(collection, bbox, outputPath, output_format);
 
       // Get file size
       const stats = await stat(outputPath);

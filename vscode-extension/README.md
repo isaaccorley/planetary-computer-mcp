@@ -44,9 +44,7 @@ Once configured, open Copilot Chat and use these tools:
 - **`search_stac`**: Query STAC catalog by collection, bbox, datetime, limit
 - **`get_collections`**: List all collections or get detailed info for a specific collection (assets, bands, resolutions)
 - **`describe_collection`**: Get structured metadata with RGB/DEM/SAR strategy and recommended tools
-- **`download_asset`**: Download GeoTIFF/assets with auto URL signing
-- **`download_visual`**: Download RGB images with smart rendering (JPG for optical/DEM, PNG for classified)
-- **`download_multispectral`**: Download specific bands into multi-band GeoTIFF
+- **`download_raster`**: Download satellite/raster data with auto RGB preview generation
 - **`download_geometries`**: Download vector data (e.g., MS Buildings) with spatial filtering
 - **`download_zarr`**: Download spatial/temporal slices from Zarr collections (Daymet, ERA5, TerraClimate)
 - **`render_zarr_preview`**: Create heatmap PNG previews from downloaded Zarr data

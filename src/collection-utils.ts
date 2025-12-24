@@ -181,29 +181,29 @@ export function selectZarrAsset(
 export function getNonOpticalSuggestion(collection: string): string {
   const suggestions: Record<string, string> = {
     "cop-dem-glo-30":
-      "This is elevation data (DEM). Use download_multispectral with assets=['data'] to get elevation values.",
+      "This is elevation data (DEM). Use download_raster with assets=['data'] to get elevation values.",
     "cop-dem-glo-90":
-      "This is elevation data (DEM). Use download_multispectral with assets=['data'] to get elevation values.",
+      "This is elevation data (DEM). Use download_raster with assets=['data'] to get elevation values.",
     "sentinel-1-rtc":
-      "This is SAR radar data. Use download_multispectral with assets=['vv', 'vh'] for backscatter data.",
+      "This is SAR radar data. Use download_raster with assets=['vv', 'vh'] for backscatter data.",
     "sentinel-1-grd":
-      "This is SAR radar data. Use download_multispectral with assets=['vv', 'vh'] for backscatter data.",
+      "This is SAR radar data. Use download_raster with assets=['vv', 'vh'] for backscatter data.",
     "alos-dem":
-      "This is elevation data (DEM). Use download_multispectral with assets=['data'] to get elevation values.",
+      "This is elevation data (DEM). Use download_raster with assets=['data'] to get elevation values.",
   };
 
   // Check for partial matches
   const lowerCollection = collection.toLowerCase();
   if (lowerCollection.includes("dem") || lowerCollection.includes("elevation")) {
-    return "This appears to be elevation data. Use download_multispectral with assets=['data'] to get elevation values.";
+    return "This appears to be elevation data. Use download_raster with assets=['data'] to get elevation values.";
   }
   if (lowerCollection.includes("sar") || lowerCollection.includes("sentinel-1")) {
-    return "This appears to be SAR radar data. Use download_multispectral with assets=['vv', 'vh'] for backscatter data.";
+    return "This appears to be SAR radar data. Use download_raster with assets=['vv', 'vh'] for backscatter data.";
   }
 
   return (
     suggestions[collection] ||
-    "Use download_multispectral with specific asset names. Run get_collections with collection_id to see available assets."
+    "Use download_raster with specific asset names. Run get_collections with collection_id to see available assets."
   );
 }
 
@@ -319,4 +319,65 @@ export function getRGBStrategy(
   }
 
   return null;
+}
+
+/**
+ * Infer appropriate assets to download for a collection when none specified
+ * @param collection - The collection ID
+ * @param itemAssets - The item assets from STAC
+ * @returns Array of asset names to download
+ */
+export function inferAssetsForCollection(
+  collection: string,
+  itemAssets: Record<string, any>
+): string[] {
+  // Optical collections: prefer RGB bands
+  if (RGB_BAND_MAPPING[collection]) {
+    const mapping = RGB_BAND_MAPPING[collection];
+    const assets = [mapping.red, mapping.green, mapping.blue];
+    // Check if all assets exist
+    if (assets.every((asset) => itemAssets[asset])) {
+      return assets;
+    }
+  }
+
+  // DEM collections: use 'data' asset
+  if (DEM_COLLECTIONS.has(collection)) {
+    if (itemAssets["data"]) {
+      return ["data"];
+    }
+  }
+
+  // SAR collections: use VV and VH polarizations
+  if (SAR_COLLECTIONS.has(collection)) {
+    const assets = [];
+    if (itemAssets["vv"]) assets.push("vv");
+    if (itemAssets["vh"]) assets.push("vh");
+    if (assets.length > 0) return assets;
+  }
+
+  // Classified collections: use the classification asset
+  const classificationInfo = extractClassificationInfo(collection, itemAssets);
+  if (classificationInfo) {
+    return [classificationInfo.assetName];
+  }
+
+  // Fallback: use the first available asset that looks like data
+  const dataAssets = Object.keys(itemAssets).filter(
+    (name) =>
+      (!name.includes("thumbnail") &&
+        !name.includes("metadata") &&
+        !name.includes("info") &&
+        itemAssets[name].type?.includes("tiff")) ||
+      itemAssets[name].type?.includes("geotiff") ||
+      name === "image" ||
+      name === "data"
+  );
+
+  if (dataAssets.length > 0) {
+    return [dataAssets[0]];
+  }
+
+  // Last resort: return all assets (shouldn't happen)
+  return Object.keys(itemAssets).slice(0, 3);
 }

@@ -273,7 +273,7 @@ async function runSingleTest(
           id: 10,
           method: "tools/call",
           params: {
-            name: "download_visual",
+            name: "download_raster",
             arguments: {
               collection,
               bbox,

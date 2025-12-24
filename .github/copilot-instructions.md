@@ -22,9 +22,7 @@ TypeScript MCP server for querying Microsoft Planetary Computer STAC catalog. Su
 - **Tools:**
   - `search_stac`: Query STAC with collection, bbox, datetime, limit
   - `get_collections`: List or detail collections
-  - `download_visual`: Smart RGB/JPG/PNG downloads with colormaps
-  - `download_multispectral`: Band-specific GeoTIFFs
-  - `download_asset`: Low-level COG downloads
+  - `download_raster`: Download satellite/raster data with auto RGB preview generation
   - `download_geometries`: Vector/parquet data (MS Buildings)
   - `download_zarr`: Slice Zarr datasets (Daymet, ERA5)
   - `render_zarr_preview`: Heatmap PNG from Zarr
@@ -75,8 +73,7 @@ Add to client config:
 ## Examples
 
 - **Search:** `search_stac(collection="sentinel-2-l2a", bbox=[-122.5,47,-122,47.5], datetime="2024-06-01/2024-06-30")`
-- **Visual:** `download_visual(collection="sentinel-2-l2a", bbox=[-122.4,47.6,-122.3,47.7], datetime="2024-06-01/2024-06-30")`
-- **Multispectral:** `download_multispectral(collection="sentinel-2-l2a", assets=["B04","B08"], bbox=..., datetime=...)`
+- **Raster:** `download_raster(collection="sentinel-2-l2a", bbox=[-122.4,47.6,-122.3,47.7], datetime="2024-06-01/2024-06-30")`
 - **Geometries:** `download_geometries(collection="ms-buildings", bbox=[-122.35,47.6,-122.32,47.62])`
 
 ## Conventions
