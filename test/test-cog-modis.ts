@@ -230,7 +230,7 @@ async function runSingleTest(
                 id: 10,
                 method: "tools/call",
                 params: {
-                  name: "download_visual",
+                  name: "download_raster",
                   arguments: {
                     collection,
                     bbox,
@@ -259,7 +259,7 @@ async function runSingleTest(
                     })
                     .join("");
 
-                  if (combinedText.includes("Successfully downloaded visual")) {
+                  if (combinedText.includes("Successfully downloaded")) {
                     resolve({ success: true, message: combinedText });
                   } else {
                     resolve({ success: false, error: `Unexpected response: ${combinedText}` });

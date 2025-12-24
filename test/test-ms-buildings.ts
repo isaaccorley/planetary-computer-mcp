@@ -98,7 +98,6 @@ async function runMsBuildingsDownload(): Promise<{ success: boolean; error?: str
           arguments: {
             collection: "ms-buildings",
             bbox: TEST_BBOX,
-            limit: 2000,
             output_format: "geojson",
             output_directory: OUTPUT_DIR,
             output_filename: OUTPUT_FILENAME,
