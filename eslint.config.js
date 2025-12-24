@@ -3,7 +3,7 @@ import ts from "typescript-eslint";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "**/*.d.ts"],
+    ignores: ["dist/**", "node_modules/**", "**/*.d.ts", "vscode-extension/dist/**"],
   },
   js.configs.recommended,
   ...ts.configs.recommended,
