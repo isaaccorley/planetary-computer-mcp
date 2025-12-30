@@ -2,53 +2,6 @@
 
 <!-- version list -->
 
-## v1.0.2 (2025-12-30)
-
-### Continuous Integration
-
-- Add fast-test job and update checkout versions
-    ([`b6cbbba`](https://github.com/isaaccorley/planetary-computer-mcp/commit/b6cbbba4ef4a909f74362c647d4a7dd389ef9eed))
-
-### Features
-
-- Configure Python Semantic Release and fix MS Buildings performance
-    ([`d59f408`](https://github.com/isaaccorley/planetary-computer-mcp/commit/d59f4082562d7c11eaf8c58fb86c0fd8baceb263))
-
-- Enable changelog generation and GitHub releases in PSR
-    ([`224305b`](https://github.com/isaaccorley/planetary-computer-mcp/commit/224305bd857ce6cc3c61496ff5e48dbd2916a584))
-
-### Performance Improvements
-
-- Improve test suite performance with smart categorization
-    ([`b6cbbba`](https://github.com/isaaccorley/planetary-computer-mcp/commit/b6cbbba4ef4a909f74362c647d4a7dd389ef9eed))
-
-### Refactoring
-
-- Update release workflow environment configuration and improve README formatting
-    ([`2dd3cdd`](https://github.com/isaaccorley/planetary-computer-mcp/commit/2dd3cdd71d06dc1a73438ed16e659e02c115282a))
-
-## v1.1.0 (2025-12-30)
-
-### Continuous Integration
-
-- Add fast-test job and update checkout versions
-    ([`b6cbbba`](https://github.com/isaaccorley/planetary-computer-mcp/commit/b6cbbba4ef4a909f74362c647d4a7dd389ef9eed))
-
-### Features
-
-- Configure Python Semantic Release and fix MS Buildings performance
-    ([`d59f408`](https://github.com/isaaccorley/planetary-computer-mcp/commit/d59f4082562d7c11eaf8c58fb86c0fd8baceb263))
-
-### Performance Improvements
-
-- Improve test suite performance with smart categorization
-    ([`b6cbbba`](https://github.com/isaaccorley/planetary-computer-mcp/commit/b6cbbba4ef4a909f74362c647d4a7dd389ef9eed))
-
-### Refactoring
-
-- Update release workflow environment configuration and improve README formatting
-    ([`2dd3cdd`](https://github.com/isaaccorley/planetary-computer-mcp/commit/2dd3cdd71d06dc1a73438ed16e659e02c115282a))
-
 ## v0.1.0 (2025-12-29)
 
 ### Bug Fixes
