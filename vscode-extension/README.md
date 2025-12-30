@@ -44,15 +44,17 @@ This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) 
 Once configured, open Copilot Chat and use these tools:
 
 - **`download_data`**: Unified tool for raster, DEM, land cover, and climate data
-  - Natural language queries (e.g., "sentinel-2 imagery", "elevation data")
-  - Place names or bounding boxes
-  - Time range filtering
-  - Automatic RGB visualization generation
+
+    - Natural language queries (e.g., "sentinel-2 imagery", "elevation data")
+    - Place names or bounding boxes
+    - Time range filtering
+    - Automatic RGB visualization generation
 
 - **`download_geometries`**: Download vector data with spatial filtering
-  - Building footprints, administrative boundaries
-  - GeoParquet format output
-  - Map visualizations
+
+    - Building footprints, administrative boundaries
+    - GeoParquet format output
+    - Map visualizations
 
 ### Example Usage
 
