@@ -1,4 +1,4 @@
-# Planetary Computer MCP Server (Python)
+# Planetary Computer MCP Server
 
 A Python implementation of the Planetary Computer MCP server, providing unified access to satellite and geospatial data through natural language queries.
 
@@ -51,13 +51,13 @@ uv sync
 ### As MCP Server
 
 ```bash
-python -m src.server
+python -m planetary_computer_mcp.server
 ```
 
 ### Direct API Usage
 
 ```python
-from src.tools.download_data import download_data
+from planetary_computer_mcp.tools.download_data import download_data
 
 # Download Sentinel-2 data for San Francisco
 result = download_data(
@@ -123,16 +123,15 @@ uv sync --dev
 uv run pytest
 ```
 
-### Linting
+### Linting/Formatting
 
 ```bash
-uv run ruff check
-uv run ruff format
+uv run pre-commit run --all-files
 ```
 
 ## Architecture
 
-```
+```bash
 src/
 ├── core/           # Core utilities
 │   ├── stac_client.py    # STAC search wrapper
