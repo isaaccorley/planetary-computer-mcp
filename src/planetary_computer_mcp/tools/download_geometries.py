@@ -30,13 +30,20 @@ def download_geometries(
     """
     Download vector geometries from Planetary Computer.
 
-    Args:
-        collection: Collection ID (e.g., "ms-buildings")
-        aoi: Bounding box [W,S,E,N] or place name string
-        output_dir: Directory to save outputs
-        limit: Maximum number of features to return
+    Parameters
+    ----------
+    collection : str
+        Collection ID (e.g., "ms-buildings")
+    aoi : list[float] or str
+        Bounding box [W,S,E,N] or place name string
+    output_dir : str, optional
+        Directory to save outputs (default ".")
+    limit : int or None, optional
+        Maximum number of features to return
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dictionary with file paths and metadata
     """
     # Handle AOI
@@ -97,11 +104,16 @@ def _get_parquet_info_for_collection(
     """
     Get parquet base path and storage options for a collection.
 
-    Args:
-        collection: Collection ID (e.g., "ms-buildings")
-        bbox: Bounding box [west, south, east, north]
+    Parameters
+    ----------
+    collection : str
+        Collection ID (e.g., "ms-buildings")
+    bbox : list[float]
+        Bounding box [west, south, east, north]
 
-    Returns:
+    Returns
+    -------
+    tuple[str | None, dict[str, Any] | None]
         Tuple of (base_path, storage_options) or (None, None)
     """
     catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
@@ -146,12 +158,18 @@ def _create_vector_visualization(gdf: gpd.GeoDataFrame, output_path: str, bbox: 
     """
     Create visualization for vector data with basemap.
 
-    Args:
-        gdf: GeoDataFrame with geometries
-        output_path: Output file path
-        bbox: Bounding box for extent
+    Parameters
+    ----------
+    gdf : gpd.GeoDataFrame
+        GeoDataFrame with geometries
+    output_path : str
+        Output file path
+    bbox : list[float]
+        Bounding box for extent
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved visualization
     """
     import contextily as cx

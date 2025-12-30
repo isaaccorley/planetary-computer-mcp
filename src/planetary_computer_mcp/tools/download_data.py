@@ -82,14 +82,22 @@ def download_data(
     Automatically detects collection from query, handles geocoding,
     downloads and crops data, generates visualizations.
 
-    Args:
-        query: Natural language query (e.g., "sentinel-2 imagery")
-        aoi: Bounding box [W,S,E,N] or place name string
-        time_range: ISO8601 datetime range (e.g., "2024-01-01/2024-01-31")
-        output_dir: Directory to save outputs
-        max_cloud_cover: Maximum cloud cover for optical data
+    Parameters
+    ----------
+    query : str
+        Natural language query (e.g., "sentinel-2 imagery")
+    aoi : list[float] or str or None, optional
+        Bounding box [W,S,E,N] or place name string
+    time_range : str or None, optional
+        ISO8601 datetime range (e.g., "2024-01-01/2024-01-31")
+    output_dir : str, optional
+        Directory to save outputs
+    max_cloud_cover : int, optional
+        Maximum cloud cover for optical data
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dictionary with file paths and metadata
     """
     # Detect collection from query
@@ -129,7 +137,27 @@ def _download_raster_data(
     output_dir: str,
     max_cloud_cover: int,
 ) -> dict[str, Any]:
-    """Download raster data."""
+    """
+    Download raster data.
+
+    Parameters
+    ----------
+    collection : str
+        Collection ID (e.g., "sentinel-2-l2a")
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+    time_range : str or None
+        ISO8601 datetime range
+    output_dir : str
+        Directory to save outputs
+    max_cloud_cover : int
+        Maximum cloud cover for optical data
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary with file paths and metadata
+    """
     # Only apply cloud cover filter to collections with eo:cloud_cover property
     # Note: NAIP doesn't have cloud cover metadata
     cloud_cover_collections = ["sentinel-2-l2a", "landsat-c2-l2"]
@@ -211,6 +239,22 @@ def _download_zarr_data(
     Loads data from Planetary Computer's Zarr-based collections,
     subsets by bbox and time range, saves as NetCDF, and creates
     a time series visualization.
+
+    Parameters
+    ----------
+    collection : str
+        Collection ID (e.g., "gridmet")
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+    time_range : str or None
+        ISO8601 datetime range
+    output_dir : str
+        Directory to save outputs
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary with file paths and metadata
     """
     from ..core.zarr_utils import (
         get_zarr_metadata,
@@ -260,6 +304,20 @@ def _create_zarr_visualization(
     Create time series visualization for Zarr climate data.
 
     Plots spatial mean over time for the first variable.
+
+    Parameters
+    ----------
+    data : Any
+        xarray Dataset with climate data
+    output_path : str
+        Output file path for visualization
+    collection : str
+        Collection name for plot title
+
+    Returns
+    -------
+    None
+        Visualization is saved to the specified output path
     """
     import matplotlib.pyplot as plt
 
@@ -327,7 +385,25 @@ def _create_spatial_plot(
     var_name: str,
     collection: str,
 ) -> None:
-    """Create spatial heatmap for data without time dimension."""
+    """
+    Create spatial heatmap for data without time dimension.
+
+    Parameters
+    ----------
+    var_data : Any
+        xarray DataArray to visualize
+    output_path : str
+        Output file path for visualization
+    var_name : str
+        Variable name for plot title
+    collection : str
+        Collection name for plot title
+
+    Returns
+    -------
+    None
+        Visualization is saved to the specified output path
+    """
     import matplotlib.pyplot as plt
 
     _fig, ax = plt.subplots(figsize=(10, 8))

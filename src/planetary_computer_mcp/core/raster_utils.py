@@ -21,14 +21,22 @@ def load_raster_from_stac(
     """
     Load raster data from STAC items using odc-stac.
 
-    Args:
-        items: Signed STAC items
-        bbox: Bounding box [west, south, east, north]
-        bands: Specific bands to load (None for all)
-        resolution: Output resolution in CRS units
-        crs: Output CRS
+    Parameters
+    ----------
+    items : list[Item]
+        Signed STAC items
+    bbox : list[float] or None, optional
+        Bounding box [west, south, east, north]
+    bands : list[str] or None, optional
+        Specific bands to load (None for all)
+    resolution : float or None, optional
+        Output resolution in CRS units
+    crs : str, optional
+        Output CRS (default EPSG:4326)
 
-    Returns:
+    Returns
+    -------
+    xr.Dataset
         Xarray Dataset with raster data
     """
     load_kwargs: dict[str, Any] = {
@@ -65,14 +73,22 @@ def load_multiband_asset(
     odc-stac doesn't handle multi-band single-asset collections well,
     so we use rioxarray directly for these cases.
 
-    Args:
-        items: Signed STAC items (uses first item only)
-        asset_name: Name of the asset to load (e.g., 'image')
-        bbox: Bounding box [west, south, east, north] in EPSG:4326
-        resolution: Output resolution in degrees (ignored - uses native resolution)
-        band_names: Names for the bands (e.g., ['red', 'green', 'blue', 'nir'])
+    Parameters
+    ----------
+    items : list[Item]
+        Signed STAC items (uses first item only)
+    asset_name : str
+        Name of the asset to load (e.g., 'image')
+    bbox : list[float] or None, optional
+        Bounding box [west, south, east, north] in EPSG:4326
+    resolution : float or None, optional
+        Output resolution in degrees (ignored - uses native resolution)
+    band_names : list[str] or None, optional
+        Names for the bands (e.g., ['red', 'green', 'blue', 'nir'])
 
-    Returns:
+    Returns
+    -------
+    xr.Dataset
         Xarray Dataset with named bands
     """
     import rioxarray as rxr  # Local import for type checking
@@ -142,12 +158,18 @@ def save_raster_as_geotiff(
     """
     Save raster data as GeoTIFF.
 
-    Args:
-        data: Xarray Dataset
-        output_path: Output file path
-        nodata: NoData value
+    Parameters
+    ----------
+    data : xr.Dataset
+        Xarray Dataset
+    output_path : str
+        Output file path
+    nodata : float or None, optional
+        NoData value
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved file
     """
     # Handle temporal data - take the most recent if multiple time slices
@@ -187,10 +209,14 @@ def get_raster_metadata(data: xr.Dataset) -> dict[str, Any]:
     """
     Extract metadata from raster Dataset.
 
-    Args:
-        data: Xarray Dataset
+    Parameters
+    ----------
+    data : xr.Dataset
+        Xarray Dataset
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dictionary with metadata
     """
     # Use the first variable for metadata
@@ -223,11 +249,16 @@ def crop_raster_to_bbox(
     """
     Crop raster to bounding box.
 
-    Args:
-        data: Xarray Dataset
-        bbox: [west, south, east, north]
+    Parameters
+    ----------
+    data : xr.Dataset
+        Xarray Dataset
+    bbox : list[float]
+        [west, south, east, north]
 
-    Returns:
+    Returns
+    -------
+    xr.Dataset
         Cropped Dataset
     """
     west, south, east, north = bbox

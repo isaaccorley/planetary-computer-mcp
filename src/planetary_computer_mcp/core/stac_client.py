@@ -25,14 +25,22 @@ class PlanetaryComputerSTAC:
         """
         Search for STAC items.
 
-        Args:
-            collections: List of collection IDs
-            bbox: Bounding box [west, south, east, north]
-            datetime: ISO8601 datetime range
-            max_cloud_cover: Maximum cloud cover percentage
-            limit: Maximum number of items to return
+        Parameters
+        ----------
+        collections : list[str]
+            List of collection IDs
+        bbox : list[float] or None, optional
+            Bounding box [west, south, east, north]
+        datetime : str or None, optional
+            ISO8601 datetime range
+        max_cloud_cover : int or None, optional
+            Maximum cloud cover percentage
+        limit : int or None, optional
+            Maximum number of items to return
 
-        Returns:
+        Returns
+        -------
+        list[Item]
             List of signed STAC items
         """
         query_params = {}
@@ -54,10 +62,14 @@ class PlanetaryComputerSTAC:
         """
         Get basic info about a collection.
 
-        Args:
-            collection_id: Collection ID
+        Parameters
+        ----------
+        collection_id : str
+            Collection ID
 
-        Returns:
+        Returns
+        -------
+        dict
             Dictionary with collection metadata
         """
         collection = self.client.get_collection(collection_id)

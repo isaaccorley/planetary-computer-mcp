@@ -52,13 +52,20 @@ def create_rgb_visualization(
     """
     Create RGB visualization from raster data.
 
-    Args:
-        data: Xarray Dataset
-        output_path: Output JPEG/PNG path
-        collection: Collection ID for band selection
-        stretch: Whether to stretch values for better visualization
+    Parameters
+    ----------
+    data : xr.Dataset
+        Xarray Dataset
+    output_path : str
+        Output JPEG/PNG path
+    collection : str
+        Collection ID for band selection
+    stretch : bool, optional
+        Whether to stretch values for better visualization
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved visualization
     """
     # Select appropriate bands based on collection
@@ -107,12 +114,18 @@ def create_colormap_visualization(
     """
     Create colormap visualization for classified or continuous data.
 
-    Args:
-        data: Xarray Dataset
-        output_path: Output path
-        collection: Collection ID
+    Parameters
+    ----------
+    data : xr.Dataset
+        Xarray Dataset
+    output_path : str
+        Output path
+    collection : str
+        Collection ID
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved visualization
     """
     # Get the first band as DataArray
@@ -190,11 +203,16 @@ def normalize_rgb(rgb_array: np.ndarray, stretch: bool = True) -> np.ndarray:
     """
     Normalize RGB array to 0-255 range.
 
-    Args:
-        rgb_array: RGB array
-        stretch: Whether to apply percentile stretch
+    Parameters
+    ----------
+    rgb_array : np.ndarray
+        RGB array
+    stretch : bool, optional
+        Whether to apply percentile stretch
 
-    Returns:
+    Returns
+    -------
+    np.ndarray
         Normalized RGB array (0-255)
     """
     # Handle NaN/inf
@@ -224,10 +242,14 @@ def get_rgb_bands_for_collection(collection: str) -> list[str]:
     """
     Get RGB band names for a collection.
 
-    Args:
-        collection: Collection ID
+    Parameters
+    ----------
+    collection : str
+        Collection ID
 
-    Returns:
+    Returns
+    -------
+    list[str]
         List of band names [red, green, blue]
     """
     band_mappings = {
@@ -249,10 +271,14 @@ def get_colormap_for_collection(
     """
     Get colormap for classified collections.
 
-    Args:
-        collection: Collection ID
+    Parameters
+    ----------
+    collection : str
+        Collection ID
 
-    Returns:
+    Returns
+    -------
+    dict[int, tuple[int, int, int, int]] or str or None
         Dictionary mapping class values to RGBA colors, or matplotlib colormap name, or None
     """
     if collection in ["esa-worldcover", "io-lulc-annual-v02"]:

@@ -46,10 +46,14 @@ def detect_collection_from_query(query: str) -> str | None:
     """
     Detect collection ID from natural language query.
 
-    Args:
-        query: User query string
+    Parameters
+    ----------
+    query : str
+        User query string
 
-    Returns:
+    Returns
+    -------
+    str or None
         Collection ID or None if not detected
     """
     query_lower = query.lower()
@@ -95,10 +99,14 @@ def get_collection_type(collection_id: str) -> str:
     """
     Get the data type for a collection.
 
-    Args:
-        collection_id: Collection ID
+    Parameters
+    ----------
+    collection_id : str
+        Collection ID
 
-    Returns:
+    Returns
+    -------
+    str
         "raster", "vector", or "zarr"
     """
     return COLLECTION_TYPES.get(collection_id, "raster")  # Default to raster

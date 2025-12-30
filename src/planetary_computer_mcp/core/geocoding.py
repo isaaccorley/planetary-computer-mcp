@@ -14,14 +14,20 @@ def place_to_bbox(place_name: str) -> list[float]:
         "San Antonio" → [-98.79, 29.22, -98.28, 29.76]
         "New York City" → [-74.26, 40.50, -73.70, 40.92]
 
-    Args:
-        place_name: Human-readable place name
+    Parameters
+    ----------
+    place_name : str
+        Human-readable place name
 
-    Returns:
+    Returns
+    -------
+    list[float]
         Bounding box as [west, south, east, north]
 
-    Raises:
-        ValueError: If geocoding fails
+    Raises
+    ------
+    ValueError
+        If geocoding fails
     """
     geolocator = Nominatim(user_agent="planetary-computer-mcp")
     geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
@@ -39,14 +45,20 @@ def validate_bbox(bbox: list[float]) -> list[float]:
     """
     Validate and normalize a bounding box.
 
-    Args:
-        bbox: [west, south, east, north]
+    Parameters
+    ----------
+    bbox : list[float]
+        [west, south, east, north]
 
-    Returns:
+    Returns
+    -------
+    list[float]
         Normalized bbox
 
-    Raises:
-        ValueError: If bbox is invalid
+    Raises
+    ------
+    ValueError
+        If bbox is invalid
     """
     if len(bbox) != 4:
         raise ValueError("Bbox must have 4 elements [west, south, east, north]")

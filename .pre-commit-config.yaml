@@ -18,11 +18,10 @@ repos:
       - id: trailing-whitespace
       - id: requirements-txt-fixer
 
-  # TODO: Re-enable once docstrings are added
-  # - repo: https://github.com/numpy/numpydoc
-  #   rev: v1.10.0
-  #   hooks:
-  #     - id: numpydoc-validation
+  - repo: https://github.com/numpy/numpydoc
+    rev: v1.10.0
+    hooks:
+      - id: numpydoc-validation
 
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: v2.8.0

@@ -46,14 +46,20 @@ def get_zarr_store_url(collection_id: str) -> tuple[str, dict[str, Any], dict[st
     Uses Planetary Computer's STAC catalog to find the Zarr asset
     and signs it to get storage credentials.
 
-    Args:
-        collection_id: Planetary Computer collection ID
+    Parameters
+    ----------
+    collection_id : str
+        Planetary Computer collection ID
 
-    Returns:
+    Returns
+    -------
+    tuple[str, dict[str, Any], dict[str, Any]]
         Tuple of (zarr_url, storage_options, open_kwargs)
 
-    Raises:
-        ValueError: If collection doesn't have a Zarr asset
+    Raises
+    ------
+    ValueError
+        If collection doesn't have a Zarr asset
     """
     catalog = pystac_client.Client.open(PC_STAC_URL)
     collection = catalog.get_collection(collection_id)
@@ -103,17 +109,26 @@ def load_zarr_data(
     Supports spatial and temporal subsetting for efficient data access.
     Only loads requested variables and spatial/temporal extent.
 
-    Args:
-        collection_id: Collection ID (e.g., "gridmet", "terraclimate")
-        variables: Variables to load (None for collection defaults)
-        bbox: Bounding box [west, south, east, north] in EPSG:4326
-        time_range: ISO8601 time range (e.g., "2020-01-01/2020-12-31")
+    Parameters
+    ----------
+    collection_id : str
+        Collection ID (e.g., "gridmet", "terraclimate")
+    variables : list[str] or None, optional
+        Variables to load (None for collection defaults)
+    bbox : list[float] or None, optional
+        Bounding box [west, south, east, north] in EPSG:4326
+    time_range : str or None, optional
+        ISO8601 time range (e.g., "2020-01-01/2020-12-31")
 
-    Returns:
+    Returns
+    -------
+    xr.Dataset
         xarray Dataset with requested data
 
-    Raises:
-        ValueError: If collection not found or no data in extent
+    Raises
+    ------
+    ValueError
+        If collection not found or no data in extent
     """
     # Get Zarr store URL and credentials
     zarr_url, storage_options, open_kwargs = get_zarr_store_url(collection_id)
@@ -182,13 +197,20 @@ def load_and_compute_zarr(
     Same as load_zarr_data but triggers actual data download.
     Use for smaller subsets that fit in memory.
 
-    Args:
-        collection_id: Collection ID
-        variables: Variables to load
-        bbox: Bounding box [west, south, east, north]
-        time_range: ISO8601 time range
+    Parameters
+    ----------
+    collection_id : str
+        Collection ID
+    variables : list[str] or None, optional
+        Variables to load
+    bbox : list[float] or None, optional
+        Bounding box [west, south, east, north]
+    time_range : str or None, optional
+        ISO8601 time range
 
-    Returns:
+    Returns
+    -------
+    xr.Dataset
         Computed xarray Dataset with data in memory
     """
     ds = load_zarr_data(collection_id, variables, bbox, time_range)
@@ -202,11 +224,16 @@ def save_zarr_subset_as_netcdf(
     """
     Save Zarr data subset as NetCDF file.
 
-    Args:
-        data: xarray Dataset (should be computed/in-memory)
-        output_path: Output file path (.nc)
+    Parameters
+    ----------
+    data : xr.Dataset
+        xarray Dataset (should be computed/in-memory)
+    output_path : str
+        Output file path (.nc)
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved NetCDF file
     """
     # Ensure data is computed
@@ -226,12 +253,34 @@ def _sanitize_attrs_for_netcdf(data: xr.Dataset) -> xr.Dataset:
 
     Some Zarr datasets have attributes with characters that can't be
     encoded to UTF-8 for NetCDF files.
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        xarray Dataset with potentially problematic attributes
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with cleaned attributes
     """
 
     data = data.copy()
 
     def clean_attrs(attrs: dict) -> dict:
-        """Clean a dictionary of attributes."""
+        """
+        Clean a dictionary of attributes.
+
+        Parameters
+        ----------
+        attrs : dict
+            Dictionary of attributes to clean
+
+        Returns
+        -------
+        dict
+            Cleaned attributes dictionary
+        """
         cleaned = {}
         for key, value in attrs.items():
             if isinstance(value, str):
@@ -267,10 +316,14 @@ def get_zarr_metadata(data: xr.Dataset) -> dict[str, Any]:
     """
     Extract metadata from Zarr Dataset.
 
-    Args:
-        data: xarray Dataset
+    Parameters
+    ----------
+    data : xr.Dataset
+        xarray Dataset
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dictionary with metadata including variables, dimensions,
         coordinates, time range, and spatial extent
     """
@@ -319,10 +372,14 @@ def get_available_variables(collection_id: str) -> list[str]:
     """
     Get list of available variables for a Zarr collection.
 
-    Args:
-        collection_id: Collection ID
+    Parameters
+    ----------
+    collection_id : str
+        Collection ID
 
-    Returns:
+    Returns
+    -------
+    list[str]
         List of variable names
     """
     zarr_url, storage_options, open_kwargs = get_zarr_store_url(collection_id)

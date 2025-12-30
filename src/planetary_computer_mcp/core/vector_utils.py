@@ -12,7 +12,23 @@ from shapely.geometry import box
 
 
 def latlon_to_quadkey(lat: float, lon: float, level: int) -> str:
-    """Convert lat/lon to Bing Maps quadkey at given level."""
+    """
+    Convert lat/lon to Bing Maps quadkey at given level.
+
+    Parameters
+    ----------
+    lat : float
+        Latitude in degrees
+    lon : float
+        Longitude in degrees
+    level : int
+        Quadkey zoom level
+
+    Returns
+    -------
+    str
+        Bing Maps quadkey string
+    """
     x = int((lon + 180.0) / 360.0 * (1 << level))
     lat_rad = lat * math.pi / 180.0
     y = int(
@@ -35,11 +51,16 @@ def get_quadkeys_for_bbox(bbox: list[float], level: int = 9) -> set[str]:
     """
     Get all quadkeys at given level that intersect bbox.
 
-    Args:
-        bbox: Bounding box [west, south, east, north]
-        level: Quadkey level (default 9 for MS Buildings)
+    Parameters
+    ----------
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+    level : int, optional
+        Quadkey level (default 9 for MS Buildings)
 
-    Returns:
+    Returns
+    -------
+    set[str]
         Set of quadkey strings
     """
     west, south, east, north = bbox
@@ -70,13 +91,20 @@ def query_geoparquet_spatially(
     """
     Query GeoParquet files spatially.
 
-    Args:
-        base_path: Base path to partitioned parquet (abfs:// URL)
-        bbox: Bounding box [west, south, east, north]
-        limit: Maximum number of features to return
-        storage_options: Azure storage credentials
+    Parameters
+    ----------
+    base_path : str
+        Base path to partitioned parquet (abfs:// URL)
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+    limit : int or None, optional
+        Maximum number of features to return
+    storage_options : dict[str, Any] or None, optional
+        Azure storage credentials
 
-    Returns:
+    Returns
+    -------
+    gpd.GeoDataFrame
         GeoDataFrame with intersecting geometries
     """
     if not storage_options:
@@ -147,11 +175,16 @@ def save_geodataframe_as_parquet(
     """
     Save GeoDataFrame as GeoParquet.
 
-    Args:
-        gdf: GeoDataFrame to save
-        output_path: Output file path
+    Parameters
+    ----------
+    gdf : gpd.GeoDataFrame
+        GeoDataFrame to save
+    output_path : str
+        Output file path
 
-    Returns:
+    Returns
+    -------
+    str
         Path to saved file
     """
     gdf.to_parquet(Path(output_path))
@@ -162,10 +195,14 @@ def get_vector_metadata(gdf: gpd.GeoDataFrame) -> dict[str, Any]:
     """
     Extract metadata from GeoDataFrame.
 
-    Args:
-        gdf: GeoDataFrame
+    Parameters
+    ----------
+    gdf : gpd.GeoDataFrame
+        GeoDataFrame
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dictionary with metadata
     """
     bounds = gdf.total_bounds.tolist() if len(gdf) > 0 else None
