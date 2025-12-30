@@ -2,6 +2,7 @@
   "name": "planetary-computer-mcp",
   "displayName": "Planetary Computer STAC MCP",
   "version": "0.1.0",
+  "type": "module",
   "publisher": "isaaccorley",
   "description": "VS Code extension to configure the Planetary Computer STAC MCP server",
   "author": {
@@ -22,7 +23,7 @@
     "onStartupFinished"
   ],
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.80.0"
   },
   "main": "./dist/extension.js",
   "contributes": {
@@ -48,9 +49,9 @@
   "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^9.14.0",
-    "@types/node": "^18.0.0",
-    "typescript": "^5.0.0",
-    "@types/vscode": "^1.60.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "@types/vscode": "^1.80.0",
     "@vscode/vsce": "^3.7.1",
     "typescript-eslint": "^8.50.1",
     "@typescript-eslint/eslint-plugin": "^8.15.0",

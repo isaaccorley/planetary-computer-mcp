@@ -238,7 +238,7 @@ def _download_zarr_data(
 
     Loads data from Planetary Computer's Zarr-based collections,
     subsets by bbox and time range, saves as NetCDF, and creates
-    a time series visualization.
+    visualizations (time series, spatial heatmaps, and animations).
 
     Parameters
     ----------
@@ -276,9 +276,8 @@ def _download_zarr_data(
     raw_path = Path(output_dir) / f"{collection}-data.nc"
     save_zarr_subset_as_netcdf(data, str(raw_path))
 
-    # Create time series visualization
-    vis_path = Path(output_dir) / f"{collection}-visual.jpg"
-    _create_zarr_visualization(data, str(vis_path), collection)
+    # Create visualizations based on data structure
+    visualizations = _create_zarr_visualizations(data, collection, output_dir)
 
     # Extract metadata
     metadata = get_zarr_metadata(data)
@@ -287,12 +286,82 @@ def _download_zarr_data(
     if time_range:
         metadata["datetime"] = time_range
 
-    return {
+    result = {
         "raw": str(raw_path),
-        "visualization": str(vis_path),
         "collection": collection,
         "metadata": metadata,
     }
+    result.update(visualizations)
+
+    return result
+
+
+def _create_zarr_visualizations(
+    data: Any,
+    collection: str,
+    output_dir: str,
+) -> dict[str, str]:
+    """
+    Create multiple visualizations for Zarr climate data.
+
+    Creates time series plots, spatial heatmaps, and animations as appropriate.
+
+    Parameters
+    ----------
+    data : Any
+        xarray Dataset with climate data
+    collection : str
+        Collection name
+    output_dir : str
+        Directory to save visualizations
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary mapping visualization type to file path
+    """
+    visualizations = {}
+
+    # Get the first data variable
+    var_name = next(iter(data.data_vars))
+    var_data = data[var_name]
+
+    # Find time dimension
+    time_dim = None
+    for dim in ["time", "day"]:
+        if dim in var_data.dims:
+            time_dim = dim
+            break
+
+    # Create time series plot (spatial mean over time)
+    if time_dim is not None and len(data[time_dim]) > 1:
+        time_series_path = Path(output_dir) / f"{collection}-timeseries.jpg"
+        _create_zarr_visualization(data, str(time_series_path), collection)
+        visualizations["visualization"] = str(time_series_path)
+
+        # Create animation if we have multiple time steps
+        if len(data[time_dim]) > 3:  # Only create animation for meaningful time series
+            animation_path = Path(output_dir) / f"{collection}-animation.gif"
+            _create_zarr_animation(data, str(animation_path), collection)
+            visualizations["animation"] = str(animation_path)
+
+    # Create spatial heatmap (for first time slice or if no time dimension)
+    if time_dim is not None:
+        # Create heatmap for the middle time slice
+        middle_idx = len(data[time_dim]) // 2
+        spatial_data = var_data.isel({time_dim: middle_idx})
+        spatial_path = Path(output_dir) / f"{collection}-spatial.jpg"
+        _create_spatial_snapshot(
+            spatial_data, str(spatial_path), var_name, collection, data[time_dim].values[middle_idx]
+        )
+        visualizations["spatial"] = str(spatial_path)
+    else:
+        # No time dimension - just create spatial plot
+        spatial_path = Path(output_dir) / f"{collection}-spatial.jpg"
+        _create_spatial_plot(var_data, str(spatial_path), var_name, collection)
+        visualizations["visualization"] = str(spatial_path)
+
+    return visualizations
 
 
 def _create_zarr_visualization(
@@ -377,6 +446,171 @@ def _create_zarr_visualization(
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
+
+
+def _create_zarr_animation(
+    data: Any,
+    output_path: str,
+    collection: str,
+) -> None:
+    """
+    Create animated GIF showing temporal evolution of climate data.
+
+    Parameters
+    ----------
+    data : Any
+        xarray Dataset with climate data
+    output_path : str
+        Output file path for animation (.gif)
+    collection : str
+        Collection name for plot title
+
+    Returns
+    -------
+    None
+        Animation is saved to the specified output path
+    """
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
+    # Get the first data variable
+    var_name = next(iter(data.data_vars))
+    var_data = data[var_name]
+
+    # Find time dimension
+    time_dim = None
+    for dim in ["time", "day"]:
+        if dim in var_data.dims:
+            time_dim = dim
+            break
+
+    if time_dim is None:
+        raise ValueError("Cannot create animation: no time dimension found")
+
+    # Get time values for display
+    time_vals = data[time_dim].values
+    n_frames = min(len(time_vals), 20)  # Limit to 20 frames for reasonable file size
+
+    # Set up the figure
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Handle units (e.g., Kelvin to Celsius for temperature)
+    units = var_data.attrs.get("units", "")
+    display_units = units
+    if units == "K" and "temperature" in var_name.lower():
+        display_units = "°C"
+
+    # Create colormap
+    cmap = plt.get_cmap("RdYlBu_r")  # Red-Yellow-Blue reversed (warm=cold)
+
+    def animate(frame_idx: int) -> list:
+        ax.clear()
+
+        # Get data for this frame
+        frame_data = var_data.isel({time_dim: frame_idx})
+
+        # Handle units conversion
+        plot_data = frame_data.values
+        if units == "K" and "temperature" in var_name.lower():
+            plot_data = plot_data - 273.15
+
+        # Create heatmap
+        im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="lower")
+
+        # Add colorbar
+        if frame_idx == 0:  # Only add colorbar once
+            cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+            cbar.set_label(f"{var_name} ({display_units})")
+
+        # Add timestamp
+        timestamp = str(time_vals[frame_idx])[:10]  # YYYY-MM-DD format
+        ax.set_title(
+            f"{collection.upper()}: {var_name}\n{timestamp}", fontsize=14, fontweight="bold"
+        )
+
+        ax.axis("off")
+        return [im]
+
+    # Create animation
+    # Sample frames evenly across the time series
+    frame_indices = [int(i * (len(time_vals) - 1) / (n_frames - 1)) for i in range(n_frames)]
+    anim = animation.FuncAnimation(fig, animate, frames=frame_indices, interval=500, blit=True)
+
+    # Save as GIF
+    anim.save(output_path, writer="pillow", fps=2, dpi=100)
+    plt.close(fig)
+
+
+def _create_spatial_snapshot(
+    var_data: Any,
+    output_path: str,
+    var_name: str,
+    collection: str,
+    timestamp: Any = None,
+) -> None:
+    """
+    Create spatial heatmap for a specific time slice.
+
+    Parameters
+    ----------
+    var_data : Any
+        xarray DataArray for a specific time slice
+    output_path : str
+        Output file path for visualization
+    var_name : str
+        Variable name for plot title
+    collection : str
+        Collection name for plot title
+    timestamp : Any, optional
+        Timestamp for the data slice
+
+    Returns
+    -------
+    None
+        Visualization is saved to the specified output path
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Handle units (e.g., Kelvin to Celsius for temperature)
+    units = var_data.attrs.get("units", "")
+    display_units = units
+    plot_data = var_data.values
+    if units == "K" and "temperature" in var_name.lower():
+        plot_data = plot_data - 273.15
+        display_units = "°C"
+
+    # Create colormap - use appropriate colors for different variables
+    if "temperature" in var_name.lower():
+        cmap = plt.get_cmap("RdYlBu_r")  # Warm colors for temperature
+    elif "precipitation" in var_name.lower() or "pr" in var_name.lower():
+        cmap = plt.get_cmap("Blues")  # Blue for precipitation
+    else:
+        cmap = plt.get_cmap("viridis")  # Default
+
+    # Get 2D slice if needed
+    if plot_data.ndim > 2:
+        for dim in plot_data.shape:
+            if dim not in [plot_data.shape[-2], plot_data.shape[-1]]:  # Keep spatial dims
+                plot_data = plot_data[0]  # Take first slice of extra dims
+
+    im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="lower")
+    cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+    cbar.set_label(f"{var_name} ({display_units})")
+
+    # Create title
+    title = f"{collection.upper()}: {var_name}"
+    if timestamp is not None:
+        timestamp_str = str(timestamp)[:10] if hasattr(timestamp, "__str__") else str(timestamp)
+        title += f"\n{timestamp_str}"
+
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.axis("off")
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 
 def _create_spatial_plot(

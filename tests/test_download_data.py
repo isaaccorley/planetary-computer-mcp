@@ -234,11 +234,18 @@ def test_download_gridmet_climate_data():
 
     # Check that files were created
     raw_path = Path(result["raw"])
-    vis_path = Path(result["visualization"])
-    assert raw_path.exists()
+
+    # Check that at least one visualization exists
+    vis_keys = [k for k in result if k.endswith(("visualization", "spatial", "animation"))]
+    assert len(vis_keys) > 0, f"No visualization found in result keys: {list(result.keys())}"
+
+    # Check the primary visualization
+    vis_path = Path(result[vis_keys[0]])
     assert vis_path.exists()
-    assert raw_path.stat().st_size > 0
     assert vis_path.stat().st_size > 0
+
+    assert raw_path.exists()
+    assert raw_path.stat().st_size > 0
     assert result["collection"] == "gridmet"
 
     # Check file extension (should be .nc for NetCDF)
@@ -249,7 +256,7 @@ def test_download_gridmet_climate_data():
     assert "time_range" in result["metadata"]
     assert result["metadata"]["collection"] == "gridmet"
 
-    # Save visualization to samples
+    # Save first visualization to samples
     sample_path = Path("samples") / f"{result['collection']}-visual{vis_path.suffix}"
     shutil.copy(vis_path, sample_path)
 
@@ -269,11 +276,18 @@ def test_download_terraclimate_data():
 
     # Check that files were created
     raw_path = Path(result["raw"])
-    vis_path = Path(result["visualization"])
-    assert raw_path.exists()
+
+    # Check that at least one visualization exists
+    vis_keys = [k for k in result if k.endswith(("visualization", "spatial", "animation"))]
+    assert len(vis_keys) > 0, f"No visualization found in result keys: {list(result.keys())}"
+
+    # Check the primary visualization
+    vis_path = Path(result[vis_keys[0]])
     assert vis_path.exists()
-    assert raw_path.stat().st_size > 0
     assert vis_path.stat().st_size > 0
+
+    assert raw_path.exists()
+    assert raw_path.stat().st_size > 0
     assert result["collection"] == "terraclimate"
 
     # Check file extension
@@ -283,6 +297,6 @@ def test_download_terraclimate_data():
     assert "variables" in result["metadata"]
     assert result["metadata"]["collection"] == "terraclimate"
 
-    # Save visualization to samples
+    # Save first visualization to samples
     sample_path = Path("samples") / f"{result['collection']}-visual{vis_path.suffix}"
     shutil.copy(vis_path, sample_path)
