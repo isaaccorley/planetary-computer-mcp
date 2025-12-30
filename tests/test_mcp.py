@@ -123,7 +123,7 @@ def test_mcp_download_data_tool():
                 f"Server failed to respond to tool call within {timeout}s. stderr: {stderr}"
             )
 
-        tool_response = json.loads(response_line)
+        tool_response = json.loads(response_line)  # type: ignore[arg-type]
         assert tool_response["id"] == 2
         assert "result" in tool_response
 
@@ -268,7 +268,7 @@ def test_mcp_download_geometries_tool():
                 f"Server failed to respond to tool call within {timeout}s. stderr: {stderr}"
             )
 
-        tool_response = json.loads(response_line)
+        tool_response = json.loads(response_line)  # type: ignore[arg-type]
         assert tool_response["id"] == 2
         assert "result" in tool_response
 
