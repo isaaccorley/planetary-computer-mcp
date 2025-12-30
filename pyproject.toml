@@ -141,7 +141,7 @@ lint.isort.known-first-party = [ "src" ]
 testpaths = [ "tests" ]
 addopts = "-v --cov=src --cov-report=term-missing"
 pythonpath = [ "src" ]
- markers = [
+markers = [
   "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
   "fast: marks tests as fast-running (suitable for frequent execution)",
   "slow: marks tests as slow-running (skip in CI or when speed is critical)",
