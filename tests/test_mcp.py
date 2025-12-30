@@ -5,6 +5,7 @@ These tests verify the full MCP tool call flow for download_data and download_ge
 """
 
 import json
+import os
 import subprocess
 import tempfile
 import time
@@ -161,6 +162,9 @@ def test_mcp_download_data_tool():
 @pytest.mark.slow  # Downloads ~91MB parquet file, takes 15-25s
 def test_mcp_download_geometries_tool():
     """Test MCP server download_geometries tool call with MS Buildings."""
+    if os.environ.get("CI"):
+        pytest.skip("Skipping MS Buildings download test in CI - unreliable network/API")
+
     # Start server process with stdio
     proc = subprocess.Popen(
         ["uv", "run", "python", "-m", "planetary_computer_mcp.server"],
