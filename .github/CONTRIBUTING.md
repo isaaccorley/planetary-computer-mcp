@@ -1,19 +1,18 @@
 ## Contributing / Developer setup
 
-This project uses Bun for local development and TypeScript for builds. The instructions below assume you have Bun installed (recommended) or Node/npm.
+This project uses uv for local development and Python for builds.
 
 1. Simple dev quickstart (recommended)
 
 ```bash
-# Install deps (Bun)
-bun install
+# Install deps
+uv sync --dev
 
 # Run checks (typecheck, format check, lint, tests)
-bun check
+pre-commit run --all-files
 
 # Start the MCP server
-bun run mcp
-
+uv run python -m planetary_computer_mcp.server
 ```
 
 ## Commit Message Convention
@@ -22,7 +21,7 @@ This project uses [Conventional Commits](https://conventionalcommits.org/) for a
 
 ### Format
 
-```
+```bash
 <type>[optional scope]: <description>
 ```
 
@@ -42,7 +41,7 @@ This project uses [Conventional Commits](https://conventionalcommits.org/) for a
 
 ### Examples
 
-```
+```bash
 feat: add Sentinel-2 L2A imagery support
 fix: resolve memory leak in Zarr processing
 docs: update API documentation
@@ -54,7 +53,7 @@ chore: update dependencies
 
 Add `!` after the type for breaking changes:
 
-```
+```bash
 feat!: remove deprecated API endpoints
 ```
 

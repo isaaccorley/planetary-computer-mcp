@@ -6,8 +6,9 @@ import math
 from pathlib import Path
 from typing import Any
 
-import fsspec
+import adlfs
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import box
 
 
@@ -45,6 +46,41 @@ def latlon_to_quadkey(lat: float, lon: float, level: int) -> str:
             digit += 2
         quadkey += str(digit)
     return quadkey
+
+
+def _get_region_from_bbox(bbox: list[float]) -> str | None:
+    """
+    Determine MS Buildings region from bbox.
+
+    Parameters
+    ----------
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+
+    Returns
+    -------
+    str or None
+        Region name or None if not found
+    """
+    west, south, _, _ = bbox
+
+    # United States (continental + Alaska/Hawaii)
+    if -160 <= west <= -66 and 18 <= south <= 71:
+        return "United States"
+
+    # Canada
+    if -141 <= west <= -52 and 41 <= south <= 84:
+        return "Canada"
+
+    # Mexico
+    if -117 <= west <= -86 and 14 <= south <= 32:
+        return "Mexico"
+
+    # North America (fallback for smaller regions)
+    if -117 <= west <= -61 and 7 <= south <= 32:
+        return "North America"
+
+    return None
 
 
 def get_quadkeys_for_bbox(bbox: list[float], level: int = 9) -> set[str]:
@@ -89,7 +125,10 @@ def query_geoparquet_spatially(
     storage_options: dict[str, Any] | None = None,
 ) -> gpd.GeoDataFrame:
     """
-    Query GeoParquet files spatially.
+    Query GeoParquet files spatially using GeoPandas.
+
+    Reads parquet files directly from Azure blob storage using fsspec,
+    then filters geometries that intersect the bounding box.
 
     Parameters
     ----------
@@ -110,14 +149,38 @@ def query_geoparquet_spatially(
     if not storage_options:
         return gpd.GeoDataFrame()
 
+    # Setup fsspec filesystem for Azure
+    fs = adlfs.AzureBlobFileSystem(
+        account_name=storage_options["account_name"],
+        credential=storage_options["credential"],
+    )
+
+    # For MS Buildings, determine region from bbox
+    region = _get_region_from_bbox(bbox)
+    if not region:
+        return gpd.GeoDataFrame()
+
     # Get quadkeys that intersect bbox
     quadkeys = get_quadkeys_for_bbox(bbox, level=9)
 
-    # Setup filesystem
-    fs = fsspec.filesystem("abfs", **storage_options)
+    # Convert abfs path to fsspec path for region partition
+    base_path_no_abfs = base_path.replace("abfs://", "")
+    if "RegionName=" in base_path_no_abfs:
+        # Region is already in the base path from STAC
+        region_path = base_path_no_abfs
+    else:
+        # Add region partition
+        region_path = f"{base_path_no_abfs}/RegionName={region}"
 
-    # Find parquet files for relevant quadkeys
-    base_path_clean = base_path.replace("abfs://", "")
+    # Create bbox geometry for spatial filtering
+    bbox_geom = box(bbox[0], bbox[1], bbox[2], bbox[3])
+
+    # Prepare storage options for geopandas
+    gpd_storage_options = {
+        "account_name": storage_options["account_name"],
+        "credential": storage_options["credential"],
+    }
+
     all_gdfs = []
     total_count = 0
 
@@ -125,47 +188,47 @@ def query_geoparquet_spatially(
         if limit and total_count >= limit:
             break
 
-        qk_path = f"{base_path_clean}/quadkey={qk}"
+        # Look for parquet files in the quadkey subdirectory
+        qk_path = f"{region_path}/quadkey={qk}"
+
         try:
-            files = fs.ls(qk_path)
-        except FileNotFoundError:
+            # List parquet files in this quadkey partition
+            parquet_files = fs.glob(f"{qk_path}/*.parquet")
+
+            if not parquet_files:
+                continue
+
+            # Process parquet files for this quadkey
+            for remote_file in parquet_files:
+                if limit and total_count >= limit:
+                    break
+
+                # Read directly from Azure using fsspec (no local download)
+                az_path = f"az://{remote_file}"
+                gdf = gpd.read_parquet(az_path, storage_options=gpd_storage_options)
+
+                # Spatial filter using bbox
+                filtered = gdf[gdf.geometry.intersects(bbox_geom)]
+
+                if len(filtered) > 0:
+                    # Apply limit if needed
+                    if limit:
+                        remaining = limit - total_count
+                        if len(filtered) > remaining:
+                            filtered = filtered.head(remaining)
+
+                    all_gdfs.append(filtered)
+                    total_count += len(filtered)
+
+        except Exception:
+            # Continue with other quadkeys on failure
             continue
-
-        for f in files:
-            if not f.endswith(".parquet"):
-                continue
-
-            file_url = f"abfs://{f}"
-            try:
-                gdf = gpd.read_parquet(file_url, storage_options=storage_options)
-
-                # Clip to bbox
-                bbox_geom = box(bbox[0], bbox[1], bbox[2], bbox[3])
-                clipped = gdf[gdf.geometry.intersects(bbox_geom)]
-
-                if len(clipped) > 0:
-                    all_gdfs.append(clipped)
-                    total_count += len(clipped)
-
-                    if limit and total_count >= limit:
-                        break
-            except Exception as e:
-                print(f"Warning: Failed to read {file_url}: {e}")
-                continue
 
     if not all_gdfs:
         return gpd.GeoDataFrame()
 
     # Combine results
-    import pandas as pd
-
-    combined = gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
-
-    # Apply limit
-    if limit and len(combined) > limit:
-        combined = combined.head(limit)
-
-    return combined
+    return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
 
 
 def save_geodataframe_as_parquet(

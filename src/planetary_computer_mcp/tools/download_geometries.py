@@ -119,17 +119,8 @@ def _get_parquet_info_for_collection(
     catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
     client = Client.open(catalog_url)
 
-    # Determine region based on bbox (simplified - US/Canada only for now)
-    region_filter = None
-    if -125 <= bbox[0] <= -66 and 24 <= bbox[1] <= 50:
-        region_filter = "United States"
-    elif -141 <= bbox[0] <= -52 and 41 <= bbox[1] <= 84:
-        region_filter = "Canada"
-
     # Search for items intersecting bbox
     query_params = {}
-    if region_filter:
-        query_params["msbuildings:region"] = {"eq": region_filter}
 
     search = client.search(
         collections=[collection],

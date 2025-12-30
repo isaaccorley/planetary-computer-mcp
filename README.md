@@ -118,26 +118,6 @@ src/
 └── server.py       # MCP server entry point
 ```
 
-## Comparison to JavaScript Version
-
-| Aspect         | JavaScript          | Python                             |
-| -------------- | ------------------- | ---------------------------------- |
-| Lines of code  | ~2700               | ~800                               |
-| Dependencies   | Node.js, geotiff.js | Python, odc-stac                   |
-| STAC handling  | Manual              | pystac-client + planetary-computer |
-| Raster loading | geotiff.js          | odc-stac (faster)                  |
-| Vector queries | Custom SQL          | DuckDB                             |
-| Visualization  | sharp               | matplotlib                         |
-| Geocoding      | None                | geopy                              |
-
-## Contributing
-
-1. Fork the repository
-1. Create a feature branch
-1. Add tests for new functionality
-1. Ensure `uv run ruff check` and `uv run pytest` pass
-1. Submit a pull request
-
 ## License
 
-MIT License
+Apache 2.0 License

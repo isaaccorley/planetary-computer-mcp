@@ -69,6 +69,7 @@ dev = [
   "pre-commit>=4.3",
   "pytest>=8.4.2",
   "pytest-cov>=7",
+  "python-semantic-release>=9.15.0",
   "ruff>=0.14.1",
   "ty>=0.0.1a23",
 ]
@@ -167,3 +168,8 @@ checks = [
   "RT02",
   "RT03",
 ]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+build_command = "uv lock --upgrade-package planetary-computer-mcp && uv build"
+commit_parser = "conventional"
