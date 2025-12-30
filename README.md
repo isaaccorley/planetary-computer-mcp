@@ -1,112 +1,152 @@
-# 🌍 planetary-computer-mcp
+# Planetary Computer MCP Server
 
-[![npm version](https://img.shields.io/npm/v/planetary-computer-mcp.svg)](https://www.npmjs.com/package/planetary-computer-mcp)
-[![Website](https://img.shields.io/badge/Website-isaacc.dev%2Fplanetary--computer--mcp-blue)](https://isaacc.dev/planetary-computer-mcp)
-[![License](https://img.shields.io/npm/l/planetary-computer-mcp.svg)](https://github.com/isaaccorley/planetary-computer-mcp/blob/main/LICENSE)
-
-> **Access petabytes of Earth observation data through natural conversation.**
-
-A Model Context Protocol (MCP) server that connects AI assistants to the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) — unlocking satellite imagery, climate data, land cover maps, and more. Query Sentinel-2, Landsat, NAIP aerial imagery, global DEMs, and 120+ geospatial datasets using simple spatial and temporal filters.
+A Python implementation of the Planetary Computer MCP server, providing unified access to satellite and geospatial data through natural language queries.
 
 ## Sample Outputs
 
 <table>
 <tr>
-<td align="center"><img src="assets/images/sentinel_2_l2a_alps.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Alps</sub></td>
-<td align="center"><img src="assets/images/sentinel_2_l2a_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Miami</sub></td>
-<td align="center"><img src="assets/images/naip_small-seattle.jpg" width="200"><br><sub><b>NAIP</b><br>Seattle</sub></td>
-<td align="center"><img src="assets/images/naip_medium-la.jpg" width="200"><br><sub><b>NAIP</b><br>Los Angeles</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/sentinel_2_l2a_alps.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Alps</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/sentinel_2_l2a_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-2</b><br>Miami</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/naip_small-seattle.jpg" width="200"><br><sub><b>NAIP</b><br>Seattle</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/naip_medium-la.jpg" width="200"><br><sub><b>NAIP</b><br>Los Angeles</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="assets/images/hls2_l30_medium-la.jpg" width="200"><br><sub><b>HLS L30</b><br>Los Angeles</sub></td>
-<td align="center"><img src="assets/images/modis_09A1_061_large-bay.jpg" width="200"><br><sub><b>MODIS</b><br>Bay Area</sub></td>
-<td align="center"><img src="assets/images/sentinel_1_rtc_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-1 SAR</b><br>Miami</sub></td>
-<td align="center"><img src="assets/images/cop_dem_glo_30_coastal-miami.jpg" width="200"><br><sub><b>Copernicus DEM</b><br>Miami</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/hls2_l30_medium-la.jpg" width="200"><br><sub><b>HLS L30</b><br>Los Angeles</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/modis_09A1_061_large-bay.jpg" width="200"><br><sub><b>MODIS</b><br>Bay Area</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/sentinel_1_rtc_coastal-miami.jpg" width="200"><br><sub><b>Sentinel-1 SAR</b><br>Miami</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/cop_dem_glo_30_coastal-miami.jpg" width="200"><br><sub><b>Copernicus DEM</b><br>Miami</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="assets/images/esa_worldcover_alps.png" width="200"><br><sub><b>ESA WorldCover</b><br>Alps</sub></td>
-<td align="center"><img src="assets/images/io_lulc_annual_v02_rural-iowa.png" width="200"><br><sub><b>IO LULC</b><br>Iowa</sub></td>
-<td align="center"><img src="assets/images/ms-buildings.jpg" width="200"><br><sub><b>MS Buildings</b><br>Vector Data</sub></td>
-<td align="center"><img src="assets/images/pet_preview.png" width="200"><br><sub><b>TerraClimate PET</b><br>Zarr Preview</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/esa_worldcover_alps.png" width="200"><br><sub><b>ESA WorldCover</b><br>Alps</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/io_lulc_annual_v02_rural-iowa.png" width="200"><br><sub><b>IO LULC</b><br>Iowa</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/ms-buildings.jpg" width="200"><br><sub><b>MS Buildings</b><br>Vector Data</sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/isaaccorley/planetary-computer-mcp/main/assets/images/pet_preview.png" width="200"><br><sub><b>TerraClimate PET</b><br>Zarr Preview</sub></td>
 </tr>
 </table>
 
-## Add to VSCode, Cursor, Antigravity
+<table>
+<tr>
+<td align="center"><img src="assets/images/gridmet-heatmap-animation.gif" width="300"><br><sub><b>GridMET Climate Data</b><br>Heatmap Animation</sub></td>
+<td align="center"><img src="assets/images/terraclimate-heatmap-animation.gif" width="300"><br><sub><b>TerraClimate Data</b><br>Heatmap Animation</sub></td>
+</tr>
+</table>
 
-Add the following to your mcp.json file (Cmd+Shift+P -> MCP: Add Server)
+## Features
 
-```json
-{
-  "servers": {
-    ...
-    "planetary-computer": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "planetary-computer-mcp@latest"]
-    },
-  ...
-  }
-}
-```
+- **Unified Interface**: Single `download_data` tool that automatically detects datasets from natural language queries
+- **Geocoding**: Convert place names (e.g., "San Francisco") to bounding boxes
+- **Multi-format Support**: Raster (GeoTIFF), Vector (GeoParquet), and Zarr data
+- **Automatic Visualization**: Generate RGB/JPEG previews for LLM analysis
+- **Fast Downloads**: Uses odc-stac for efficient COG access
 
-## Install
+## Installation
 
 ```bash
-npm install planetary-computer-mcp
-
-# or locally
-npx planetary-computer-mcp  # or `bunx planetary-computer-mcp`
+uv sync
 ```
 
 ## Usage
 
-### Tools
+### As MCP Server
 
-- **`search_stac`**: Query STAC catalog by collection, bbox, datetime, limit
-- **`get_collections`**: List all collections or get detailed info for a specific collection (assets, bands, resolutions)
-- **`describe_collection`**: Get structured metadata with RGB/DEM/SAR strategy and recommended tools
-- **`download_asset`**: Download GeoTIFF/assets with auto URL signing
-- **`download_visual`**: Download RGB images with smart rendering (JPG for optical/DEM, PNG for classified)
-- **`download_multispectral`**: Download specific bands into multi-band GeoTIFF
-- **`download_geometries`**: Download vector data (e.g., MS Buildings) with spatial filtering
-- **`download_zarr`**: Download spatial/temporal slices from Zarr collections (Daymet, ERA5, TerraClimate)
-- **`render_zarr_preview`**: Create heatmap PNG previews from downloaded Zarr data
+```bash
+python -m planetary_computer_mcp.server
+```
 
-**Supported Collections:**
+### Direct API Usage
 
-- Optical: sentinel-2-l2a, naip, landsat-c2-l2, hls2-l30/s30
-- DEM: cop-dem-glo-30, alos-dem
-- Land Cover: esa-worldcover, io-lulc-annual-v02, mtbs
-- SAR: sentinel-1-rtc
-- Vector: ms-buildings
-- Climate/Weather: daymet-daily-na, daymet-daily-hi, daymet-daily-pr, era5-pds, terraclimate
+```python
+from planetary_computer_mcp.tools.download_data import download_data
 
-## Examples
+# Download Sentinel-2 data for San Francisco
+result = download_data(
+    query="sentinel-2 imagery",
+    aoi="San Francisco",
+    time_range="2024-01-01/2024-01-31"
+)
 
-- **Search Sentinel-2**: `search_stac(collection="sentinel-2-l2a", bbox=[-122.5,47,-122,47.5], datetime="2024-06-01/2024-06-30")`
-- **Visual Download**: `download_visual(collection="sentinel-2-l2a", bbox=[-122.4,47.6,-122.3,47.7], datetime="2024-06-01/2024-06-30")`
-- **Multispectral**: `download_multispectral(collection="sentinel-2-l2a", assets=["B04","B08"], bbox=..., datetime=...)`
-- **Buildings**: `download_geometries(collection="ms-buildings", bbox=[-122.35,47.6,-122.32,47.62])`
-- **Climate Data**: `download_zarr(collection="daymet-daily-na", assets=["tmax","tmin"], bbox=[-122.5,47,-122,47.5], datetime="2024-01-01/2024-01-31")`
-- **Zarr Preview**: `render_zarr_preview(zarr_path="path/to/daymet_daily_na/tmax")`
+print(f"Raw data: {result['raw']}")
+print(f"Visualization: {result['visualization']}")
+```
 
-## Architecture
+## Tools
 
-- **Language**: TypeScript on Node.js ≥18
-- **Framework**: MCP SDK with stdio transport
-- **API**: Planetary Computer STAC catalog
-- **Geotiff.js**: Read/Writing Cloud Optimized Geotiffs (COG)
-- **DuckDB WASM**: Spatial queries on parquet
-- **Zarrita.js**: Read/Writing with n-dimensional Zarr stores
-- **Features**: Auto URL signing, streaming downloads, collection caching
+### download_data
+
+Unified tool for raster, DEM, land cover, and climate data.
+
+**Parameters:**
+
+- `query`: Natural language query (e.g., "sentinel-2", "elevation data")
+- `aoi`: Bounding box [W,S,E,N] or place name
+- `time_range`: ISO8601 datetime range
+- `max_cloud_cover`: Maximum cloud cover (optical data)
+
+**Returns:**
+
+- Raw GeoTIFF/Zarr/Parquet file
+- RGB/JPEG visualization
+- Metadata
+
+### download_geometries
+
+Tool for vector/building data.
+
+**Parameters:**
+
+- `collection`: Collection ID (e.g., "ms-buildings")
+- `aoi`: Bounding box or place name
+- `limit`: Maximum features
+
+**Returns:**
+
+- GeoParquet file
+- Map visualization
+- Feature count
+
+## Supported Datasets
+
+See [collections.md](collections.md) for the complete list of supported datasets.
 
 ## Development
 
+### Setup
+
 ```bash
-bun install               # Install deps
-bun run build             # Compile to dist/
-bun run format            # Format code
-bun run check             # Typecheck, lint, prettier, tests
-bun run test:integration  # Run all integration tests
-bun run mcp               # Start MCP server
+uv sync --dev
 ```
+
+### Testing
+
+```bash
+uv run pytest
+```
+
+### Linting/Formatting
+
+```bash
+uv run pre-commit run --all-files
+```
+
+## Architecture
+
+```bash
+src/
+├── core/           # Core utilities
+│   ├── stac_client.py    # STAC search wrapper
+│   ├── geocoding.py      # Place name → bbox
+│   ├── collections.py    # Dataset metadata
+│   ├── raster_utils.py   # odc-stac helpers
+│   ├── vector_utils.py   # DuckDB helpers
+│   ├── visualization.py  # Matplotlib viz
+│   └── zarr_utils.py     # Xarray Zarr helpers
+├── tools/          # MCP tools
+│   ├── download_data.py
+│   └── download_geometries.py
+└── server.py       # MCP server entry point
+```
+
+## License
+
+Apache 2.0 License

@@ -10,9 +10,8 @@ export function activate(context: vscode.ExtensionContext) {
       provideMcpServerDefinitions: async () => {
         const servers: vscode.McpServerDefinition[] = [];
         servers.push(
-          new vscode.McpStdioServerDefinition("planetary-computer", "npx", [
-            "-y",
-            "planetary-computer-mcp@latest",
+          new vscode.McpStdioServerDefinition("planetary-computer", "uvx", [
+            "planetary-computer-mcp",
           ])
         );
         return servers;
