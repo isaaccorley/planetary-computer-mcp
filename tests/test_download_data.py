@@ -6,10 +6,16 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
+import numpy as np
+import pandas as pd
 import pytest
+import xarray as xr
 
 
+# Mark as integration test since it requires network access
+@pytest.mark.integration
 # Mark as integration test since it requires network access
 @pytest.mark.integration
 def test_download_sentinel2_data():
@@ -262,41 +268,409 @@ def test_download_gridmet_climate_data():
 
 
 @pytest.mark.integration
-def test_download_terraclimate_data():
-    """Test downloading TerraClimate data (Zarr-based)."""
+@pytest.mark.slow
+def test_download_gridmet_large_area_climate_visualization():
+    """Test downloading GridMET climate data with large-area heatmap visualization."""
     from planetary_computer_mcp.tools.download_data import download_data
 
-    # TerraClimate is global monthly climate data at ~4km resolution
+    # Large AOI in Western US for meaningful spatial patterns (4km resolution)
+    # This creates a heatmap visualization and animation
     result = download_data(
-        query="terraclimate",
-        aoi=[-118.3, 34.0, -118.1, 34.2],  # 0.2 x 0.2 deg LA area
-        time_range="2020-01-01/2020-03-31",  # 3 months in 2020
+        query="gridmet temperature",
+        aoi=[-125, 32, -110, 42],  # Western US extent
+        time_range="2020-06-01/2020-06-07",  # One week for animation
         output_dir=tempfile.mkdtemp(),
     )
 
     # Check that files were created
     raw_path = Path(result["raw"])
+    assert raw_path.exists()
+    assert raw_path.stat().st_size > 0
+    assert result["collection"] == "gridmet"
+    assert raw_path.suffix == ".nc"
 
-    # Check that at least one visualization exists
-    vis_keys = [k for k in result if k.endswith(("visualization", "spatial", "animation"))]
-    assert len(vis_keys) > 0, f"No visualization found in result keys: {list(result.keys())}"
+    # Check visualizations
+    assert "visualization" in result  # Static heatmap
+    assert "animation" in result  # Animated GIF
 
-    # Check the primary visualization
-    vis_path = Path(result[vis_keys[0]])
+    vis_path = Path(result["visualization"])
+    anim_path = Path(result["animation"])
+
     assert vis_path.exists()
+    assert anim_path.exists()
     assert vis_path.stat().st_size > 0
+    assert anim_path.stat().st_size > 0
 
+    assert vis_path.suffix == ".jpg"
+    assert anim_path.suffix == ".gif"
+
+    # Check metadata
+    assert "variables" in result["metadata"]
+    assert result["metadata"]["collection"] == "gridmet"
+    assert "bbox" in result["metadata"]
+
+    # Save visualizations to samples (skip in CI for speed)
+    if not os.environ.get("CI"):
+        sample_vis_path = (
+            Path("samples") / f"{result['collection']}-heatmap-visualization{vis_path.suffix}"
+        )
+        sample_anim_path = (
+            Path("samples") / f"{result['collection']}-heatmap-animation{anim_path.suffix}"
+        )
+        shutil.copy(vis_path, sample_vis_path)
+        shutil.copy(anim_path, sample_anim_path)
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_download_terraclimate_large_area_climate_visualization():
+    """Test downloading TerraClimate data with large-area heatmap visualization."""
+    from planetary_computer_mcp.tools.download_data import download_data
+
+    # Large AOI in North America for meaningful spatial patterns (4km resolution)
+    # This creates a heatmap visualization and animation
+    result = download_data(
+        query="terraclimate",
+        aoi=[-130, 20, -60, 50],  # North America extent
+        time_range="2020-01-01/2020-12-31",  # Full year for animation
+        output_dir=tempfile.mkdtemp(),
+    )
+
+    # Check that files were created
+    raw_path = Path(result["raw"])
     assert raw_path.exists()
     assert raw_path.stat().st_size > 0
     assert result["collection"] == "terraclimate"
-
-    # Check file extension
     assert raw_path.suffix == ".nc"
+
+    # Check visualizations
+    assert "visualization" in result  # Static heatmap
+    assert "animation" in result  # Animated GIF
+
+    vis_path = Path(result["visualization"])
+    anim_path = Path(result["animation"])
+
+    assert vis_path.exists()
+    assert anim_path.exists()
+    assert vis_path.stat().st_size > 0
+    assert anim_path.stat().st_size > 0
+
+    assert vis_path.suffix == ".jpg"
+    assert anim_path.suffix == ".gif"
 
     # Check metadata
     assert "variables" in result["metadata"]
     assert result["metadata"]["collection"] == "terraclimate"
+    assert "bbox" in result["metadata"]
 
-    # Save first visualization to samples
-    sample_path = Path("samples") / f"{result['collection']}-visual{vis_path.suffix}"
-    shutil.copy(vis_path, sample_path)
+
+@pytest.mark.integration
+@pytest.mark.fast
+def test_download_gridmet_small_area_climate_visualization():
+    """Test downloading GridMET climate data with small-area heatmap visualization."""
+    from planetary_computer_mcp.tools.download_data import download_data
+
+    # Small AOI in California for fast processing (4km resolution)
+    # California extent for meaningful but fast spatial patterns
+    result = download_data(
+        query="gridmet temperature",
+        aoi=[-124, 32, -114, 42],  # California extent
+        time_range="2020-06-01/2020-06-03",  # 3 days for fast animation
+        output_dir=tempfile.mkdtemp(),
+    )
+
+    # Check that files were created
+    raw_path = Path(result["raw"])
+    assert raw_path.exists()
+    assert raw_path.stat().st_size > 0
+    assert result["collection"] == "gridmet"
+    assert raw_path.suffix == ".nc"
+
+    # Check visualizations - animation only created for > 3 time steps
+    assert "visualization" in result  # Static heatmap
+
+    vis_path = Path(result["visualization"])
+    assert vis_path.exists()
+    assert vis_path.stat().st_size > 0
+    assert vis_path.suffix == ".jpg"
+
+    # Check metadata
+    assert "variables" in result["metadata"]
+    assert result["metadata"]["collection"] == "gridmet"
+    assert "bbox" in result["metadata"]
+
+    # Save visualizations to samples (skip in CI for speed)
+    if not os.environ.get("CI"):
+        sample_vis_path = (
+            Path("samples") / f"{result['collection']}-small-heatmap-visualization{vis_path.suffix}"
+        )
+        shutil.copy(vis_path, sample_vis_path)
+        # Only save animation if it exists
+        if "animation" in result:
+            sample_anim_path = (
+                Path("samples")
+                / f"{result['collection']}-small-heatmap-animation{Path(result['animation']).suffix}"
+            )
+            shutil.copy(result["animation"], sample_anim_path)
+
+
+@pytest.mark.integration
+@pytest.mark.fast
+def test_download_terraclimate_small_area_climate_visualization():
+    """Test downloading TerraClimate data with small-area heatmap visualization."""
+    from planetary_computer_mcp.tools.download_data import download_data
+
+    # Small AOI in US East Coast for fast processing (4km resolution)
+    # East Coast extent for meaningful but fast spatial patterns
+    result = download_data(
+        query="terraclimate",
+        aoi=[-85, 30, -70, 45],  # US East Coast extent
+        time_range="2020-01-01/2020-03-31",  # 3 months for fast animation
+        output_dir=tempfile.mkdtemp(),
+    )
+
+    # Check that files were created
+    raw_path = Path(result["raw"])
+    assert raw_path.exists()
+    assert raw_path.stat().st_size > 0
+    assert result["collection"] == "terraclimate"
+    assert raw_path.suffix == ".nc"
+
+    # Check visualizations - animation only created for > 3 time steps
+    assert "visualization" in result  # Static heatmap
+
+    vis_path = Path(result["visualization"])
+    assert vis_path.exists()
+    assert vis_path.stat().st_size > 0
+    assert vis_path.suffix == ".jpg"
+
+    # Check metadata
+    assert "variables" in result["metadata"]
+    assert result["metadata"]["collection"] == "terraclimate"
+    assert "bbox" in result["metadata"]
+
+    # Save visualizations to samples (skip in CI for speed)
+    if not os.environ.get("CI"):
+        sample_vis_path = (
+            Path("samples") / f"{result['collection']}-small-heatmap-visualization{vis_path.suffix}"
+        )
+        shutil.copy(vis_path, sample_vis_path)
+        # Only save animation if it exists
+        if "animation" in result:
+            sample_anim_path = (
+                Path("samples")
+                / f"{result['collection']}-small-heatmap-animation{Path(result['animation']).suffix}"
+            )
+            shutil.copy(result["animation"], sample_anim_path)
+
+
+@pytest.fixture
+def mock_zarr_dataset():
+    """Create a mock xarray Dataset for testing visualizations.
+
+    Returns
+    -------
+    xr.Dataset
+        Mock dataset with temperature data
+    """
+    # Create synthetic data similar to climate data
+    lat = np.linspace(34.0, 34.2, 20)
+    lon = np.linspace(-118.3, -118.1, 20)
+    time = pd.date_range("2020-01-01", "2020-01-07", freq="D")  # 7 days
+
+    # Create temperature data (in Kelvin)
+    temperature = 280 + 10 * np.random.rand(len(time), len(lat), len(lon))  # 280-290K
+
+    ds = xr.Dataset(
+        {"tmmx": (["time", "lat", "lon"], temperature)},
+        coords={"time": time, "lat": lat, "lon": lon},
+    )
+
+    # Add attributes
+    ds["tmmx"].attrs["units"] = "K"
+
+    return ds
+
+
+@pytest.fixture
+def mock_spatial_data():
+    """Create mock spatial data without time dimension.
+
+    Returns
+    -------
+    xr.DataArray
+        Mock spatial data array
+    """
+    lat = np.linspace(34.0, 34.2, 20)
+    lon = np.linspace(-118.3, -118.1, 20)
+
+    # Create elevation data
+    elevation = 500 + 200 * np.random.rand(len(lat), len(lon))  # 500-700m
+
+    da = xr.DataArray(elevation, coords={"lat": lat, "lon": lon}, dims=["lat", "lon"])
+    da.attrs["units"] = "m"
+
+    return da
+
+
+@pytest.mark.fast
+def test_create_zarr_visualizations_with_time(mock_zarr_dataset):
+    """Test _create_zarr_visualizations with time series data.
+
+    Parameters
+    ----------
+    mock_zarr_dataset : xr.Dataset
+        Mock dataset fixture
+
+    Returns
+    -------
+    None
+        Test passes if function works correctly
+    """
+    from planetary_computer_mcp.tools.download_data import _create_zarr_visualizations
+
+    output_dir = tempfile.mkdtemp()
+
+    with (
+        patch("planetary_computer_mcp.tools.download_data._create_zarr_visualization"),
+        patch("planetary_computer_mcp.tools.download_data._create_zarr_animation"),
+        patch("planetary_computer_mcp.tools.download_data._create_spatial_snapshot"),
+    ):
+        result = _create_zarr_visualizations(mock_zarr_dataset, "test-collection", output_dir)
+
+        # Should have visualization and animation keys (no spatial key in new logic)
+        assert "visualization" in result
+        assert "animation" in result
+        assert len(result) == 2
+
+        # Check file paths exist
+        for path in result.values():
+            assert path.startswith(output_dir)
+            assert "test-collection" in path
+
+
+@pytest.mark.fast
+def test_create_zarr_visualizations_no_time(mock_spatial_data):
+    """Test _create_zarr_visualizations with spatial-only data.
+
+    Parameters
+    ----------
+    mock_spatial_data : xr.DataArray
+        Mock spatial data fixture
+
+    Returns
+    -------
+    None
+        Test passes if function works correctly
+    """
+    from planetary_computer_mcp.tools.download_data import _create_zarr_visualizations
+
+    output_dir = tempfile.mkdtemp()
+
+    # Convert to dataset
+    ds = xr.Dataset({"elevation": mock_spatial_data})
+
+    with patch("planetary_computer_mcp.tools.download_data._create_spatial_plot"):
+        result = _create_zarr_visualizations(ds, "test-collection", output_dir)
+
+        # Should only have spatial visualization
+        assert "visualization" in result
+        assert len(result) == 1
+
+
+@pytest.mark.fast
+def test_create_zarr_visualization(mock_zarr_dataset):
+    """Test _create_zarr_visualization creates a time series plot.
+
+    Parameters
+    ----------
+    mock_zarr_dataset : xr.Dataset
+        Mock dataset fixture
+
+    Returns
+    -------
+    None
+        Test passes if visualization file is created
+    """
+    from planetary_computer_mcp.tools.download_data import _create_zarr_visualization
+
+    output_path = Path(tempfile.mkdtemp()) / "test_viz.jpg"
+
+    _create_zarr_visualization(mock_zarr_dataset, str(output_path), "test-collection")
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+@pytest.mark.fast
+def test_create_spatial_snapshot(mock_zarr_dataset):
+    """Test _create_spatial_snapshot creates a spatial heatmap.
+
+    Parameters
+    ----------
+    mock_zarr_dataset : xr.Dataset
+        Mock dataset fixture
+
+    Returns
+    -------
+    None
+        Test passes if spatial snapshot file is created
+    """
+    from planetary_computer_mcp.tools.download_data import _create_spatial_snapshot
+
+    output_path = Path(tempfile.mkdtemp()) / "test_spatial.jpg"
+    var_data = mock_zarr_dataset["tmmx"].isel(time=0)  # First time slice
+
+    _create_spatial_snapshot(var_data, str(output_path), "tmmx", "test-collection")
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+@pytest.mark.fast
+def test_create_spatial_plot(mock_spatial_data):
+    """Test _create_spatial_plot creates a spatial visualization.
+
+    Parameters
+    ----------
+    mock_spatial_data : xr.DataArray
+        Mock spatial data fixture
+
+    Returns
+    -------
+    None
+        Test passes if spatial plot file is created
+    """
+    from planetary_computer_mcp.tools.download_data import _create_spatial_plot
+
+    output_path = Path(tempfile.mkdtemp()) / "test_plot.jpg"
+
+    _create_spatial_plot(mock_spatial_data, str(output_path), "elevation", "test-collection")
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+@pytest.mark.fast
+def test_create_zarr_animation(mock_zarr_dataset):
+    """Test _create_zarr_animation creates an animated GIF.
+
+    Parameters
+    ----------
+    mock_zarr_dataset : xr.Dataset
+        Mock dataset fixture
+
+    Returns
+    -------
+    None
+        Test passes if animation GIF file is created
+    """
+    from planetary_computer_mcp.tools.download_data import _create_zarr_animation
+
+    output_path = Path(tempfile.mkdtemp()) / "test_animation.gif"
+
+    _create_zarr_animation(mock_zarr_dataset, str(output_path), "test-collection")
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    assert output_path.suffix == ".gif"

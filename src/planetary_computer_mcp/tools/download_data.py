@@ -333,31 +333,25 @@ def _create_zarr_visualizations(
             time_dim = dim
             break
 
-    # Create time series plot (spatial mean over time)
-    if time_dim is not None and len(data[time_dim]) > 1:
-        time_series_path = Path(output_dir) / f"{collection}-timeseries.jpg"
-        _create_zarr_visualization(data, str(time_series_path), collection)
-        visualizations["visualization"] = str(time_series_path)
+    # Create spatial heatmap as primary visualization (single time point)
+    if time_dim is not None:
+        # Create heatmap for the middle time slice as main visualization
+        middle_idx = len(data[time_dim]) // 2
+        spatial_data = var_data.isel({time_dim: middle_idx})
+        spatial_path = Path(output_dir) / f"{collection}-visualization.jpg"
+        _create_spatial_snapshot(
+            spatial_data, str(spatial_path), var_name, collection, data[time_dim].values[middle_idx]
+        )
+        visualizations["visualization"] = str(spatial_path)
 
-        # Create animation if we have multiple time steps
+        # Create animation if we have multiple time steps (GIF of spatial heatmaps)
         if len(data[time_dim]) > 3:  # Only create animation for meaningful time series
             animation_path = Path(output_dir) / f"{collection}-animation.gif"
             _create_zarr_animation(data, str(animation_path), collection)
             visualizations["animation"] = str(animation_path)
-
-    # Create spatial heatmap (for first time slice or if no time dimension)
-    if time_dim is not None:
-        # Create heatmap for the middle time slice
-        middle_idx = len(data[time_dim]) // 2
-        spatial_data = var_data.isel({time_dim: middle_idx})
-        spatial_path = Path(output_dir) / f"{collection}-spatial.jpg"
-        _create_spatial_snapshot(
-            spatial_data, str(spatial_path), var_name, collection, data[time_dim].values[middle_idx]
-        )
-        visualizations["spatial"] = str(spatial_path)
     else:
-        # No time dimension - just create spatial plot
-        spatial_path = Path(output_dir) / f"{collection}-spatial.jpg"
+        # No time dimension - create spatial plot as main visualization
+        spatial_path = Path(output_dir) / f"{collection}-visualization.jpg"
         _create_spatial_plot(var_data, str(spatial_path), var_name, collection)
         visualizations["visualization"] = str(spatial_path)
 
@@ -489,10 +483,10 @@ def _create_zarr_animation(
 
     # Get time values for display
     time_vals = data[time_dim].values
-    n_frames = min(len(time_vals), 20)  # Limit to 20 frames for reasonable file size
+    n_frames = min(len(time_vals), 10)  # Limit to 10 frames for faster generation
 
-    # Set up the figure
-    fig, ax = plt.subplots(figsize=(10, 8))
+    # Set up the figure - smaller size for tighter zoom
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     # Handle units (e.g., Kelvin to Celsius for temperature)
     units = var_data.attrs.get("units", "")
@@ -502,6 +496,17 @@ def _create_zarr_animation(
 
     # Create colormap
     cmap = plt.get_cmap("RdYlBu_r")  # Red-Yellow-Blue reversed (warm=cold)
+
+    # Get data for first frame to set up colorbar
+    first_frame_data = var_data.isel({time_dim: 0})
+    plot_data = first_frame_data.values
+    if units == "K" and "temperature" in var_name.lower():
+        plot_data = plot_data - 273.15
+
+    # Create initial plot with colorbar - reduce shrink for tighter layout
+    im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="upper")
+    cbar = plt.colorbar(im, ax=ax, shrink=0.85)
+    cbar.set_label(f"{var_name} ({display_units})")
 
     def animate(frame_idx: int) -> list:
         ax.clear()
@@ -514,13 +519,8 @@ def _create_zarr_animation(
         if units == "K" and "temperature" in var_name.lower():
             plot_data = plot_data - 273.15
 
-        # Create heatmap
-        im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="lower")
-
-        # Add colorbar
-        if frame_idx == 0:  # Only add colorbar once
-            cbar = plt.colorbar(im, ax=ax, shrink=0.8)
-            cbar.set_label(f"{var_name} ({display_units})")
+        # Create heatmap - use origin="upper" for north-up orientation
+        im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="upper")
 
         # Add timestamp
         timestamp = str(time_vals[frame_idx])[:10]  # YYYY-MM-DD format
@@ -534,9 +534,10 @@ def _create_zarr_animation(
     # Create animation
     # Sample frames evenly across the time series
     frame_indices = [int(i * (len(time_vals) - 1) / (n_frames - 1)) for i in range(n_frames)]
-    anim = animation.FuncAnimation(fig, animate, frames=frame_indices, interval=500, blit=True)
+    anim = animation.FuncAnimation(fig, animate, frames=frame_indices, interval=500, blit=False)
 
-    # Save as GIF
+    # Save as GIF - use tight layout like static plots
+    plt.tight_layout()
     anim.save(output_path, writer="pillow", fps=2, dpi=100)
     plt.close(fig)
 
@@ -595,8 +596,8 @@ def _create_spatial_snapshot(
             if dim not in [plot_data.shape[-2], plot_data.shape[-1]]:  # Keep spatial dims
                 plot_data = plot_data[0]  # Take first slice of extra dims
 
-    im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="lower")
-    cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+    im = ax.imshow(plot_data, cmap=cmap, aspect="auto", origin="upper")
+    cbar = plt.colorbar(im, ax=ax, shrink=0.85)
     cbar.set_label(f"{var_name} ({display_units})")
 
     # Create title
@@ -650,7 +651,7 @@ def _create_spatial_plot(
             if dim not in ["lat", "lon", "x", "y", "latitude", "longitude"]:
                 plot_data = plot_data.isel({dim: 0})
 
-    im = ax.imshow(plot_data.values, aspect="auto", cmap="viridis")
+    im = ax.imshow(plot_data.values, aspect="auto", cmap="viridis", origin="upper")
     plt.colorbar(im, ax=ax, label=var_data.attrs.get("units", ""))
 
     ax.set_title(f"{collection.upper()}: {var_name}", fontsize=14, fontweight="bold")
