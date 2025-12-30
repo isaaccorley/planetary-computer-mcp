@@ -227,7 +227,6 @@ def _sanitize_attrs_for_netcdf(data: xr.Dataset) -> xr.Dataset:
     Some Zarr datasets have attributes with characters that can't be
     encoded to UTF-8 for NetCDF files.
     """
-    import copy
 
     data = data.copy()
 

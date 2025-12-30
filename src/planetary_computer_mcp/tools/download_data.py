@@ -38,12 +38,12 @@ NATIVE_RESOLUTIONS: dict[str, float] = {
     # SAR
     "sentinel-1-rtc": 0.0001,  # 10m
     "sentinel-1-grd": 0.0001,  # 10m
-    "alos-palsar": 0.000113,  # 12.5m
+    "also-palsar": 0.000113,  # 12.5m
     # DEMs
     "cop-dem-glo-30": 0.00027,  # 30m
     "cop-dem-glo-90": 0.00081,  # 90m
     "copernicus-dem": 0.00027,  # 30m
-    "alos-dem": 0.00027,  # 30m
+    "also-dem": 0.00027,  # 30m
     "nasadem": 0.00027,  # 30m
     "3dep-seamless": 0.00009,  # 10m (varies by region)
     # Land cover
@@ -262,10 +262,9 @@ def _create_zarr_visualization(
     Plots spatial mean over time for the first variable.
     """
     import matplotlib.pyplot as plt
-    import numpy as np
 
     # Get the first data variable
-    var_name = list(data.data_vars)[0]
+    var_name = next(iter(data.data_vars))
     var_data = data[var_name]
 
     # Find time dimension
@@ -285,7 +284,7 @@ def _create_zarr_visualization(
     time_series = var_data.mean(dim=spatial_dims)
 
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 6))
+    _fig, ax = plt.subplots(figsize=(12, 6))
 
     # Plot time series
     time_vals = data[time_dim].values
@@ -331,7 +330,7 @@ def _create_spatial_plot(
     """Create spatial heatmap for data without time dimension."""
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    _fig, ax = plt.subplots(figsize=(10, 8))
 
     # Get 2D slice if needed
     plot_data = var_data

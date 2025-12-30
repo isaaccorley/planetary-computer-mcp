@@ -135,9 +135,9 @@ if not items:
 ### Adding New Collections
 
 1. Add to `COLLECTION_KEYWORDS` in `core/collections.py`
-2. Add to `COLLECTION_TYPES` if not raster
-3. Add native resolution to `NATIVE_RESOLUTIONS` in `tools/download_data.py`
-4. Add RGB bands to `get_rgb_bands_for_collection()` if optical
+1. Add to `COLLECTION_TYPES` if not raster
+1. Add native resolution to `NATIVE_RESOLUTIONS` in `tools/download_data.py`
+1. Add RGB bands to `get_rgb_bands_for_collection()` if optical
 
 ### STAC Search Pattern
 
@@ -199,11 +199,11 @@ Ignored: `TRY003` (long exception messages OK), `RET505/506` (explicit returns O
 ## Pre-commit Hooks
 
 1. ruff (lint + format)
-2. check-yaml, check-json
-3. numpydoc-validation
-4. pyproject-fmt
-5. nbstripout
-6. mdformat
-7. typos
-8. ty-check (type checking)
-9. uv-lock
+1. check-yaml, check-json
+1. numpydoc-validation
+1. pyproject-fmt
+1. nbstripout
+1. mdformat
+1. typos
+1. ty-check (type checking)
+1. uv-lock

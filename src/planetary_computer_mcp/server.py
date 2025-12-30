@@ -2,8 +2,6 @@
 MCP server entry point for Planetary Computer tools.
 """
 
-import asyncio
-
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
@@ -109,10 +107,10 @@ Metadata:
         ]
 
 
-async def main() -> None:
+def main() -> None:
     """Main server entry point."""
     mcp.run()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
