@@ -6,6 +6,8 @@ A Visual Studio Code extension that configures the Planetary Computer MCP server
 
 This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) for the [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/) STAC catalog, allowing GitHub Copilot to search and download satellite imagery, DEMs, land cover data, and vector datasets.
 
+**Note**: This extension configures the Python-based Planetary Computer MCP server. See the [main repository](https://github.com/isaaccorley/planetary-computer-mcp) for the server implementation.
+
 ## Sample Outputs
 
 <table>
@@ -41,45 +43,52 @@ This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) 
 
 Once configured, open Copilot Chat and use these tools:
 
-- **`search_stac`**: Query STAC catalog by collection, bbox, datetime, limit
-- **`get_collections`**: List all collections or get detailed info for a specific collection (assets, bands, resolutions)
-- **`describe_collection`**: Get structured metadata with RGB/DEM/SAR strategy and recommended tools
-- **`download_asset`**: Download GeoTIFF/assets with auto URL signing
-- **`download_visual`**: Download RGB images with smart rendering (JPG for optical/DEM, PNG for classified)
-- **`download_multispectral`**: Download specific bands into multi-band GeoTIFF
-- **`download_geometries`**: Download vector data (e.g., MS Buildings) with spatial filtering
-- **`download_zarr`**: Download spatial/temporal slices from Zarr collections (Daymet, ERA5, TerraClimate)
-- **`render_zarr_preview`**: Create heatmap PNG previews from downloaded Zarr data
+- **`download_data`**: Unified tool for raster, DEM, land cover, and climate data
+  - Natural language queries (e.g., "sentinel-2 imagery", "elevation data")
+  - Place names or bounding boxes
+  - Time range filtering
+  - Automatic RGB visualization generation
+
+- **`download_geometries`**: Download vector data with spatial filtering
+  - Building footprints, administrative boundaries
+  - GeoParquet format output
+  - Map visualizations
 
 ### Example Usage
 
 Ask your LLM Agent the following in Copilot Chat, Cursor, Claude Code, etc.
 
 ```bash
-Find recent Sentinel-2 imagery over Seattle from June 2024
+Download Sentinel-2 imagery over Seattle from June 2024
 
-Download building footprints for San Francisco
+Get building footprints for San Francisco
 
-Create a heatmap of the temperature data in NYC in 2000 and in 2020
+Download elevation data for the Rocky Mountains
 
-Get multispectral bands for vegetation analysis in the Smoky Mountains
+Find NAIP imagery of Miami Airport
 
-Download NAIP imagery of Miami Airport
+Get land cover data for Iowa
 ```
 
-## Tested Collections
+The `download_data` tool automatically detects the dataset type from your natural language query and handles the appropriate processing pipeline.
 
-- **Optical Imagery**: Sentinel-2 L2A, NAIP, Landsat C2 L2, HLS L30/L8
-- **Digital Elevation Models**: Copernicus GLO-30, ALSO DEM
-- **Land Cover**: ESA WorldCover, IO LULC, MTBS fire data
-- **SAR**: Sentinel-1 RTC
-- **Vector Data**: Microsoft Buildings
+## Supported Datasets
 
-### Performance Issues
+See the [main repository](https://github.com/isaaccorley/planetary-computer-mcp) for the complete list of supported datasets and collections.
+
+### Performance Notes
 
 - Large downloads may take time due to data size
 - Use smaller bounding boxes for faster results
-- The server uses streaming downloads to minimize memory usage
+- The server uses efficient streaming downloads to minimize memory usage
+
+## Implementation
+
+This extension configures the Python-based Planetary Computer MCP server. For detailed information about the server implementation, supported datasets, and development:
+
+- [Main Repository](https://github.com/isaaccorley/planetary-computer-mcp)
+- [Collections Documentation](https://github.com/isaaccorley/planetary-computer-mcp/blob/main/collections.md)
+- [Python API Usage](https://github.com/isaaccorley/planetary-computer-mcp#usage)
 
 ## License
 
