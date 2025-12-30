@@ -4,7 +4,7 @@ requires = [ "uv-build>=0.9.3,<0.10" ]
 
 [project]
 name = "planetary-computer-mcp"
-version = "0.1.0"
+version = "1.1.0"
 description = "A Python MCP Server for interacting with the Planetary Computer STAC Catalog."
 readme = "README.md"
 keywords = [
@@ -173,3 +173,6 @@ checks = [
 version_toml = [ "pyproject.toml:project.version" ]
 build_command = "uv lock --upgrade-package planetary-computer-mcp && uv build"
 commit_parser = "conventional"
+changelog_file = "CHANGELOG.md"
+changelog_mode = "update"
+vcs_release = true
