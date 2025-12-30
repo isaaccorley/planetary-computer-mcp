@@ -38,12 +38,12 @@ NATIVE_RESOLUTIONS: dict[str, float] = {
     # SAR
     "sentinel-1-rtc": 0.0001,  # 10m
     "sentinel-1-grd": 0.0001,  # 10m
-    "also-palsar": 0.000113,  # 12.5m
+    "alos-palsar": 0.000113,  # 12.5m
     # DEMs
     "cop-dem-glo-30": 0.00027,  # 30m
     "cop-dem-glo-90": 0.00081,  # 90m
     "copernicus-dem": 0.00027,  # 30m
-    "also-dem": 0.00027,  # 30m
+    "alos-dem": 0.00027,  # 30m
     "nasadem": 0.00027,  # 30m
     "3dep-seamless": 0.00009,  # 10m (varies by region)
     # Land cover
