@@ -1,36 +1,27 @@
-name: Release
+name: Publish to PyPI
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
 
 jobs:
   release:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
       id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v5
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+      - name: Install uv and setup the python version
+        uses: astral-sh/setup-uv@v7.1
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - name: Install the project
+        run: uv sync --all-groups
 
-      - name: Build
-        run: bun run build
+      - name: Build wheel
+        run: uv build
 
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bunx semantic-release
+      - name: Publish package
+        run: uv publish

@@ -2,7 +2,6 @@
 Geocoding utilities for converting place names to bounding boxes.
 """
 
-
 from geopy.extra.rate_limiter import RateLimiter
 from geopy.geocoders import Nominatim
 

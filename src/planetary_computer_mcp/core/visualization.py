@@ -2,11 +2,11 @@
 Visualization utilities for generating RGB/JPEG previews from raster data.
 """
 
-
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from PIL import Image
 
 # ESA WorldCover colormap
 ESA_WORLDCOVER_CMAP = {
@@ -22,6 +22,25 @@ ESA_WORLDCOVER_CMAP = {
     95: (0, 207, 117, 255),  # Mangroves - green
     100: (250, 230, 160, 255),  # Moss/lichen - beige
 }
+
+# Terrain/elevation colormap (blue to green to brown)
+TERRAIN_CMAP = [
+    (0, 0, 255, 255),  # Deep blue (low elevation)
+    (0, 100, 255, 255),  # Blue
+    (0, 200, 255, 255),  # Light blue
+    (0, 255, 200, 255),  # Cyan
+    (0, 255, 0, 255),  # Green
+    (100, 255, 0, 255),  # Light green
+    (200, 255, 0, 255),  # Yellow-green
+    (255, 255, 0, 255),  # Yellow
+    (255, 200, 0, 255),  # Orange
+    (255, 150, 0, 255),  # Dark orange
+    (255, 100, 0, 255),  # Red-orange
+    (200, 100, 0, 255),  # Brown
+    (150, 75, 0, 255),  # Dark brown
+    (100, 50, 0, 255),  # Darker brown
+    (255, 255, 255, 255),  # White (high elevation)
+]
 
 
 def create_rgb_visualization(
@@ -56,7 +75,7 @@ def create_rgb_visualization(
             rgb_data.append(band_data)
         else:
             # Fallback: use first available band
-            first_band = list(data.data_vars.keys())[0]
+            first_band = next(iter(data.data_vars.keys()))
             band_data = data[first_band].values
             if "time" in data.dims:
                 band_data = band_data[0]
@@ -73,13 +92,9 @@ def create_rgb_visualization(
     # Normalize to 0-255
     rgb_normalized = normalize_rgb(rgb_array, stretch=stretch)
 
-    # Save as image
-    plt.figure(figsize=(10, 10))
-    plt.imshow(rgb_normalized)
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(output_path, bbox_inches="tight", dpi=150)
-    plt.close()
+    # Save as image using Pillow to preserve original resolution
+    img = Image.fromarray(rgb_normalized)
+    img.save(output_path)
 
     return output_path
 
@@ -90,7 +105,7 @@ def create_colormap_visualization(
     collection: str,
 ) -> str:
     """
-    Create colormap visualization for classified data.
+    Create colormap visualization for classified or continuous data.
 
     Args:
         data: Xarray Dataset
@@ -102,7 +117,7 @@ def create_colormap_visualization(
     """
     # Get the first band as DataArray
     if isinstance(data, xr.Dataset) and len(data.data_vars) > 0:
-        band_name = list(data.data_vars.keys())[0]
+        band_name = next(iter(data.data_vars.keys()))
         band_data = data[band_name]
     elif isinstance(data, xr.DataArray):
         band_data = data
@@ -120,39 +135,53 @@ def create_colormap_visualization(
     values = np.squeeze(values)
 
     # Create colormap
-    cmap_dict = get_colormap_for_collection(collection)
-    if cmap_dict:
-        # Create ListedColormap
-        bounds = sorted(cmap_dict.keys())
+    cmap_info = get_colormap_for_collection(collection)
+    if isinstance(cmap_info, dict):
+        # Discrete colormap for classified data
+        bounds = sorted(cmap_info.keys())
         colors = []
         for val in bounds:
-            r, g, b, a = cmap_dict[val]
+            r, g, b, a = cmap_info[val]
             colors.append((r / 255, g / 255, b / 255, a / 255))
 
         cmap = mcolors.ListedColormap(colors)
         norm = mcolors.BoundaryNorm(bounds + [max(bounds) + 1], cmap.N)
+
+        # Apply colormap to values
+        rgba = cmap(norm(values))
+        rgb_array = (rgba[:, :, :3] * 255).astype(np.uint8)  # Drop alpha, keep RGB
+    elif isinstance(cmap_info, str):
+        # Matplotlib colormap for continuous data
+        try:
+            cmap = plt.get_cmap(cmap_info)
+        except (AttributeError, ValueError):
+            # Fallback to grayscale if colormap not found
+            cmap = plt.get_cmap("gray")
+
+        # Normalize values to 0-1 range for colormap
+        values_min = np.min(values)
+        values_max = np.max(values)
+        if values_max > values_min:
+            norm = mcolors.Normalize(vmin=values_min, vmax=values_max)
+            rgba = cmap(norm(values))
+            rgb_array = (rgba[:, :, :3] * 255).astype(np.uint8)
+        else:
+            # Constant value
+            rgb_array = np.full(values.shape + (3,), 128, dtype=np.uint8)
     else:
         # Default grayscale
-        cmap = "gray"
-        norm = None
-        bounds = None
+        # Normalize values to 0-255
+        values_min = np.min(values)
+        values_max = np.max(values)
+        if values_max > values_min:
+            gray = ((values - values_min) / (values_max - values_min) * 255).astype(np.uint8)
+        else:
+            gray = np.zeros_like(values, dtype=np.uint8)
+        rgb_array = np.stack([gray, gray, gray], axis=-1)
 
-    # Plot
-    plt.figure(figsize=(10, 10))
-    if norm:
-        plt.imshow(values, cmap=cmap, norm=norm)
-    else:
-        plt.imshow(values, cmap=cmap)
-
-    # Add colorbar for classified data
-    if cmap_dict and bounds:
-        cbar = plt.colorbar(ticks=bounds, shrink=0.8)
-        cbar.set_ticklabels([f"{v}" for v in bounds])
-
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(output_path, bbox_inches="tight", dpi=150)
-    plt.close()
+    # Save as image using Pillow
+    img = Image.fromarray(rgb_array)
+    img.save(output_path)
 
     return output_path
 
@@ -174,7 +203,14 @@ def normalize_rgb(rgb_array: np.ndarray, stretch: bool = True) -> np.ndarray:
     if stretch:
         # Percentile stretch
         p2, p98 = np.percentile(rgb_array, (2, 98), axis=(0, 1))
-        rgb_array = np.clip((rgb_array - p2) / (p98 - p2), 0, 1)
+        denom = p98 - p2
+        if np.any(denom == 0) or np.any(np.isnan(denom)):
+            # If no variation, use min-max or skip stretch
+            rgb_min = np.min(rgb_array, axis=(0, 1))
+            rgb_max = np.max(rgb_array, axis=(0, 1))
+            rgb_array = (rgb_array - rgb_min) / (rgb_max - rgb_min + 1e-8)
+        else:
+            rgb_array = np.clip((rgb_array - p2) / denom, 0, 1)
     else:
         # Min-max normalization
         rgb_min = np.min(rgb_array, axis=(0, 1))
@@ -202,13 +238,14 @@ def get_rgb_bands_for_collection(collection: str) -> list[str]:
     }
 
     return band_mappings.get(
-        collection, ["B04", "B03", "B02"],
+        collection,
+        ["B04", "B03", "B02"],
     )  # Default to Sentinel bands
 
 
 def get_colormap_for_collection(
     collection: str,
-) -> dict[int, tuple[int, int, int, int]] | None:
+) -> dict[int, tuple[int, int, int, int]] | str | None:
     """
     Get colormap for classified collections.
 
@@ -216,9 +253,11 @@ def get_colormap_for_collection(
         collection: Collection ID
 
     Returns:
-        Dictionary mapping class values to RGBA colors, or None
+        Dictionary mapping class values to RGBA colors, or matplotlib colormap name, or None
     """
     if collection in ["esa-worldcover", "io-lulc-annual-v02"]:
         return ESA_WORLDCOVER_CMAP
+    elif collection in ["cop-dem-glo-30", "alos-dem"]:
+        return "terrain"  # Matplotlib terrain colormap
 
     return None

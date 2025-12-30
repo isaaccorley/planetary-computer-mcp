@@ -61,3 +61,24 @@ dmypy.json
 
 # Distribution
 *.whl
+
+# Node
+node_modules/
+build/
+.tsbuildinfo
+dist/
+.eslintcache
+.cache/
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env
+.env
+
+# Editor
+.vscode/
+
+# Coverage
+coverage/

@@ -70,7 +70,7 @@ Download NAIP imagery of Miami Airport
 ## Tested Collections
 
 - **Optical Imagery**: Sentinel-2 L2A, NAIP, Landsat C2 L2, HLS L30/L8
-- **Digital Elevation Models**: Copernicus GLO-30, ALOS DEM
+- **Digital Elevation Models**: Copernicus GLO-30, ALSO DEM
 - **Land Cover**: ESA WorldCover, IO LULC, MTBS fire data
 - **SAR**: Sentinel-1 RTC
 - **Vector Data**: Microsoft Buildings

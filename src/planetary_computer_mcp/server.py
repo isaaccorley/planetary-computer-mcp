@@ -3,23 +3,18 @@ MCP server entry point for Planetary Computer tools.
 """
 
 import asyncio
-import sys
-from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from mcp.server import Server
+from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
-from tools.download_data import download_data
-from tools.download_geometries import download_geometries
+from planetary_computer_mcp.tools.download_data import download_data
+from planetary_computer_mcp.tools.download_geometries import download_geometries
 
 # Initialize server
-server = Server("planetary-computer-mcp")
+mcp = FastMCP("planetary-computer-mcp")
 
 
-@server.tool()
+@mcp.tool()
 async def download_data_tool(
     query: str,
     aoi: str | list[float] | None = None,
@@ -69,7 +64,7 @@ Metadata:
         return [TextContent(type="text", text=f"Error downloading data: {e!s}")]
 
 
-@server.tool()
+@mcp.tool()
 async def download_geometries_tool(
     collection: str,
     aoi: list[float] | str,
@@ -114,17 +109,9 @@ Metadata:
         ]
 
 
-async def main():
+async def main() -> None:
     """Main server entry point."""
-    # Import here to avoid circular imports
-    from mcp.server.stdio import stdio_server
-
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
-        )
+    mcp.run()
 
 
 if __name__ == "__main__":

@@ -2,10 +2,10 @@
 Collection mapping and metadata for dataset auto-detection.
 """
 
-
 # Mapping of query keywords to collection IDs
 COLLECTION_KEYWORDS: dict[str, str] = {
     # Optical imagery
+    "sentinel-1": "sentinel-1-rtc",
     "sentinel": "sentinel-2-l2a",
     "sentinel-2": "sentinel-2-l2a",
     "satellite": "sentinel-2-l2a",  # Default optical
@@ -31,11 +31,14 @@ COLLECTION_KEYWORDS: dict[str, str] = {
     # SAR
     "sar": "sentinel-1-rtc",
     "radar": "sentinel-1-rtc",
-    # Climate
-    "climate": "daymet-daily-na",
-    "weather": "era5-pds",
-    "temperature": "daymet-daily-na",
-    "precipitation": "daymet-daily-na",
+    # Climate / Weather (Zarr-based)
+    "gridmet": "gridmet",
+    "terraclimate": "terraclimate",
+    "daymet": "daymet-daily-na",
+    "climate": "gridmet",  # Default to GridMET (CONUS, 4km, 1979-2020)
+    "weather": "gridmet",
+    "temperature": "gridmet",
+    "precipitation": "gridmet",
 }
 
 
@@ -57,17 +60,15 @@ def detect_collection_from_query(query: str) -> str | None:
             return collection
 
     # Fallback to Sentinel-2 for general imagery queries
-    if any(
-        word in query_lower
-        for word in ["imagery", "image", "satellite", "remote sensing"]
-    ):
+    if any(word in query_lower for word in ["imagery", "image", "satellite", "remote sensing"]):
         return "sentinel-2-l2a"
 
     return None
 
 
 # Collection metadata for tool routing
-COLLECTION_TYPES = {
+COLLECTION_TYPES: dict[str, str] = {
+    # Raster (COG-based via STAC)
     "sentinel-2-l2a": "raster",
     "naip": "raster",
     "landsat-c2-l2": "raster",
@@ -76,8 +77,16 @@ COLLECTION_TYPES = {
     "esa-worldcover": "raster",
     "io-lulc-annual-v02": "raster",
     "sentinel-1-rtc": "raster",
+    # Zarr-based climate/weather data
+    "gridmet": "zarr",
+    "terraclimate": "zarr",
     "daymet-daily-na": "zarr",
+    "daymet-daily-hi": "zarr",
+    "daymet-daily-pr": "zarr",
+    "daymet-monthly-na": "zarr",
+    "daymet-annual-na": "zarr",
     "era5-pds": "zarr",
+    # Vector (GeoParquet)
     "ms-buildings": "vector",
 }
 

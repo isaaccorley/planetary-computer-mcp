@@ -2,7 +2,6 @@
 STAC client wrapper for Planetary Computer.
 """
 
-
 import planetary_computer as pc
 from pystac import Item
 from pystac_client import Client
@@ -11,7 +10,7 @@ from pystac_client import Client
 class PlanetaryComputerSTAC:
     """Wrapper for Planetary Computer STAC operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
         self.client = Client.open(self.catalog_url)
 
@@ -66,16 +65,12 @@ class PlanetaryComputerSTAC:
             "id": collection.id,
             "title": collection.title or "",
             "description": collection.description or "",
-            "providers": [p.name for p in collection.providers]
-            if collection.providers
-            else [],
+            "providers": [p.name for p in collection.providers] if collection.providers else [],
             "extent": {
                 "temporal": collection.extent.temporal.intervals
                 if collection.extent.temporal
                 else None,
-                "spatial": collection.extent.spatial.bboxes
-                if collection.extent.spatial
-                else None,
+                "spatial": collection.extent.spatial.bboxes if collection.extent.spatial else None,
             },
         }
 
