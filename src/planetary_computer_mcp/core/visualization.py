@@ -283,7 +283,7 @@ def get_colormap_for_collection(
     """
     if collection in ["esa-worldcover", "io-lulc-annual-v02"]:
         return ESA_WORLDCOVER_CMAP
-    elif collection in ["cop-dem-glo-30", "alos-dem"]:
+    elif collection in ["cop-dem-glo-30", "also-dem"]:
         return "terrain"  # Matplotlib terrain colormap
 
     return None
