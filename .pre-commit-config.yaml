@@ -41,11 +41,6 @@ repos:
           - mdformat-mkdocs==4.0.0
           - mdformat-footnote==0.1.1
 
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.40.1
-    hooks:
-      - id: typos
-
   - repo: local
     hooks:
       - id: ty-check

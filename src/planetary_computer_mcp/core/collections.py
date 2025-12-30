@@ -17,7 +17,7 @@ COLLECTION_KEYWORDS: dict[str, str] = {
     "elevation": "cop-dem-glo-30",
     "terrain": "cop-dem-glo-30",
     "copernicus": "cop-dem-glo-30",
-    "also": "also-dem",
+    "alos": "alos-dem",
     # Land cover
     "land cover": "esa-worldcover",
     "landcover": "esa-worldcover",
@@ -77,7 +77,7 @@ COLLECTION_TYPES: dict[str, str] = {
     "naip": "raster",
     "landsat-c2-l2": "raster",
     "cop-dem-glo-30": "raster",
-    "also-dem": "raster",
+    "alos-dem": "raster",
     "esa-worldcover": "raster",
     "io-lulc-annual-v02": "raster",
     "sentinel-1-rtc": "raster",
