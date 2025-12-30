@@ -25,6 +25,13 @@ A Python implementation of the Planetary Computer MCP server, providing unified 
 </tr>
 </table>
 
+<table>
+<tr>
+<td align="center"><img src="assets/images/gridmet-heatmap-animation.gif" width="300"><br><sub><b>GridMET Climate Data</b><br>Heatmap Animation</sub></td>
+<td align="center"><img src="assets/images/terraclimate-heatmap-animation.gif" width="300"><br><sub><b>TerraClimate Data</b><br>Heatmap Animation</sub></td>
+</tr>
+</table>
+
 ## Features
 
 - **Unified Interface**: Single `download_data` tool that automatically detects datasets from natural language queries
@@ -32,18 +39,6 @@ A Python implementation of the Planetary Computer MCP server, providing unified 
 - **Multi-format Support**: Raster (GeoTIFF), Vector (GeoParquet), and Zarr data
 - **Automatic Visualization**: Generate RGB/JPEG previews for LLM analysis
 - **Fast Downloads**: Uses odc-stac for efficient COG access
-
-## Visualizations
-
-The server automatically generates visualizations for downloaded data:
-
-### Climate Data (GridMET)
-
-![GridMET Heatmap Animation](assets/images/gridmet-heatmap-animation.gif)
-
-### Climate Data (TerraClimate)
-
-![TerraClimate Heatmap Animation](assets/images/terraclimate-heatmap-animation.gif)
 
 ## Installation
 
