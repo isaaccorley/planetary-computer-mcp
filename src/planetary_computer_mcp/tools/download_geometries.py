@@ -25,7 +25,6 @@ def download_geometries(
     collection: str,
     aoi: list[float] | str,
     output_dir: str = ".",
-    limit: int | None = None,
 ) -> dict[str, Any]:
     """
     Download vector geometries from Planetary Computer.
@@ -38,8 +37,6 @@ def download_geometries(
         Bounding box [W,S,E,N] or place name string
     output_dir : str, optional
         Directory to save outputs (default ".")
-    limit : int or None, optional
-        Maximum number of features to return
 
     Returns
     -------
@@ -61,7 +58,7 @@ def download_geometries(
         raise ValueError(f"No parquet data found for {collection} in bbox {bbox}")
 
     # Query spatially
-    gdf = query_geoparquet_spatially(base_path, bbox, limit, storage_options)
+    gdf = query_geoparquet_spatially(base_path, bbox, storage_options)
 
     if len(gdf) == 0:
         raise ValueError(f"No geometries found for {collection} in the specified area")

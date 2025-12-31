@@ -136,7 +136,6 @@ async def download_geometries_tool(
     collection: str,
     aoi: list[float] | str,
     output_dir: str = ".",
-    limit: int | None = None,
 ) -> list[TextContent]:
     """
     Download vector geometries from Planetary Computer.
@@ -149,8 +148,6 @@ async def download_geometries_tool(
         Bounding box [W,S,E,N] or place name string
     output_dir : str, optional
         Directory to save outputs
-    limit : int or None, optional
-        Maximum number of features
 
     Returns
     -------
@@ -162,7 +159,6 @@ async def download_geometries_tool(
             collection=collection,
             aoi=aoi,
             output_dir=output_dir,
-            limit=limit,
         )
 
         response = f"""Successfully downloaded geometries:

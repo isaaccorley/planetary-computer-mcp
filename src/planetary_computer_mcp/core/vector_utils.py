@@ -3,13 +3,19 @@ Vector utilities for GeoParquet processing.
 """
 
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import adlfs
 import geopandas as gpd
 import pandas as pd
+import pyarrow.parquet as pq
+from shapely import Polygon
 from shapely.geometry import box
+
+# Max parallel downloads for Azure blob storage
+MAX_PARALLEL_DOWNLOADS = 8
 
 
 def latlon_to_quadkey(lat: float, lon: float, level: int) -> str:
@@ -118,17 +124,64 @@ def get_quadkeys_for_bbox(bbox: list[float], level: int = 9) -> set[str]:
     return quadkeys
 
 
+def _read_and_filter_parquet(
+    file_path: str,
+    fs: adlfs.AzureBlobFileSystem,
+    bbox_geom: Polygon,
+) -> gpd.GeoDataFrame | None:
+    """
+    Read parquet file and filter spatially.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to parquet file (without az:// prefix)
+    fs : adlfs.AzureBlobFileSystem
+        Filesystem instance for Azure blob storage
+    bbox_geom : Polygon
+        Shapely geometry for spatial filtering
+
+    Returns
+    -------
+    gpd.GeoDataFrame or None
+        Filtered GeoDataFrame or None if no matches
+    """
+    try:
+        with fs.open(file_path, "rb") as f:
+            pf = pq.ParquetFile(f)
+            table = pf.read()
+
+            df = table.to_pandas()
+            gdf = gpd.GeoDataFrame(
+                df,
+                geometry=gpd.GeoSeries.from_wkb(df["geometry"]),
+                crs="EPSG:4326",
+            )
+
+            # Spatial filter
+            mask = gdf.geometry.intersects(bbox_geom)
+            filtered = gdf[mask]
+
+            if len(filtered) > 0:
+                return filtered
+
+            return None
+
+    except Exception:
+        return None
+
+
 def query_geoparquet_spatially(
     base_path: str,
     bbox: list[float],
-    limit: int | None = None,
     storage_options: dict[str, Any] | None = None,
 ) -> gpd.GeoDataFrame:
     """
-    Query GeoParquet files spatially using GeoPandas.
+    Query GeoParquet files spatially with parallel downloads.
 
-    Reads parquet files directly from Azure blob storage using fsspec,
-    then filters geometries that intersect the bounding box.
+    Optimized implementation that:
+    1. Lists all parquet files across quadkeys
+    2. Downloads and filters files concurrently using ThreadPoolExecutor
 
     Parameters
     ----------
@@ -136,8 +189,6 @@ def query_geoparquet_spatially(
         Base path to partitioned parquet (abfs:// URL)
     bbox : list[float]
         Bounding box [west, south, east, north]
-    limit : int or None, optional
-        Maximum number of features to return
     storage_options : dict[str, Any] or None, optional
         Azure storage credentials
 
@@ -166,68 +217,46 @@ def query_geoparquet_spatially(
     # Convert abfs path to fsspec path for region partition
     base_path_no_abfs = base_path.replace("abfs://", "")
     if "RegionName=" in base_path_no_abfs:
-        # Region is already in the base path from STAC
         region_path = base_path_no_abfs
     else:
-        # Add region partition
         region_path = f"{base_path_no_abfs}/RegionName={region}"
 
     # Create bbox geometry for spatial filtering
     bbox_geom = box(bbox[0], bbox[1], bbox[2], bbox[3])
 
-    # Prepare storage options for geopandas
-    gpd_storage_options = {
-        "account_name": storage_options["account_name"],
-        "credential": storage_options["credential"],
-    }
-
-    all_gdfs = []
-    total_count = 0
-
+    # Collect all parquet files across quadkeys
+    all_parquet_files: list[str] = []
     for qk in quadkeys:
-        if limit and total_count >= limit:
-            break
-
-        # Look for parquet files in the quadkey subdirectory
         qk_path = f"{region_path}/quadkey={qk}"
-
         try:
-            # List parquet files in this quadkey partition
             parquet_files = fs.glob(f"{qk_path}/*.parquet")
-
-            if not parquet_files:
-                continue
-
-            # Process parquet files for this quadkey
-            for remote_file in parquet_files:
-                if limit and total_count >= limit:
-                    break
-
-                # Read directly from Azure using fsspec (no local download)
-                az_path = f"az://{remote_file}"
-                gdf = gpd.read_parquet(az_path, storage_options=gpd_storage_options)
-
-                # Spatial filter using bbox
-                filtered = gdf[gdf.geometry.intersects(bbox_geom)]
-
-                if len(filtered) > 0:
-                    # Apply limit if needed
-                    if limit:
-                        remaining = limit - total_count
-                        if len(filtered) > remaining:
-                            filtered = filtered.head(remaining)
-
-                    all_gdfs.append(filtered)
-                    total_count += len(filtered)
-
+            all_parquet_files.extend(parquet_files)
         except Exception:
-            # Continue with other quadkeys on failure
             continue
+
+    if not all_parquet_files:
+        return gpd.GeoDataFrame()
+
+    # Process files in parallel
+    all_gdfs: list[gpd.GeoDataFrame] = []
+
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_DOWNLOADS) as executor:
+        future_to_file = {
+            executor.submit(_read_and_filter_parquet, file_path, fs, bbox_geom): file_path
+            for file_path in all_parquet_files
+        }
+
+        for future in as_completed(future_to_file):
+            try:
+                gdf = future.result()
+                if gdf is not None and len(gdf) > 0:
+                    all_gdfs.append(gdf)
+            except Exception:
+                continue
 
     if not all_gdfs:
         return gpd.GeoDataFrame()
 
-    # Combine results
     return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
 
 
