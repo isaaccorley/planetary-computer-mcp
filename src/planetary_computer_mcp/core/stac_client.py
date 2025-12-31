@@ -21,6 +21,7 @@ class PlanetaryComputerSTAC:
         datetime: str | None = None,
         max_cloud_cover: int | None = None,
         limit: int | None = None,
+        sortby: str | None = "-datetime",
     ) -> list[Item]:
         """
         Search for STAC items.
@@ -37,6 +38,9 @@ class PlanetaryComputerSTAC:
             Maximum cloud cover percentage
         limit : int or None, optional
             Maximum number of items to return
+        sortby : str or None, optional
+            Sort order. Default "-datetime" for most recent first.
+            Use "+datetime" for oldest first, or None for no sorting.
 
         Returns
         -------
@@ -53,6 +57,7 @@ class PlanetaryComputerSTAC:
             datetime=datetime,
             query=query_params if query_params else None,
             limit=limit,
+            sortby=sortby,
         )
 
         items = list(search.items())

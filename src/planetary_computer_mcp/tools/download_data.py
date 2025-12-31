@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from ..core import (
+    calculate_bbox_area_km2,
     detect_collection_from_query,
     get_collection_type,
+    get_default_time_range,
     place_to_bbox,
     stac_client,
     validate_bbox,
@@ -22,6 +24,40 @@ from ..core.visualization import (
     create_colormap_visualization,
     create_rgb_visualization,
 )
+
+# AOI size limits in km²
+AOI_WARN_THRESHOLD_KM2 = 100  # Warn user about large AOI
+AOI_REJECT_THRESHOLD_KM2 = 1000  # Reject AOIs larger than this
+
+# Default time range in days
+DEFAULT_TIME_RANGE_DAYS = 7  # Default to last week
+
+# Resolution scaling factors based on AOI size
+RESOLUTION_SCALE_THRESHOLDS = [
+    (10, 1),  # < 10 km²: native resolution
+    (50, 2),  # 10-50 km²: 2x coarser
+    (100, 4),  # 50-100 km²: 4x coarser
+    (500, 8),  # 100-500 km²: 8x coarser
+    (1000, 16),  # 500-1000 km²: 16x coarser
+]
+
+
+class NoDataFoundError(Exception):
+    """
+    Raised when no data is found, with suggestion for retry.
+
+    Parameters
+    ----------
+    message : str
+        Error message describing the issue
+    suggestion : dict or None
+        Optional dict with retry suggestion (time_range, days, etc.)
+    """
+
+    def __init__(self, message: str, suggestion: dict | None = None) -> None:
+        super().__init__(message)
+        self.suggestion = suggestion
+
 
 # Native resolutions in degrees (approximate at equator)
 # These match the native pixel size of each collection
@@ -68,16 +104,104 @@ NATIVE_RESOLUTIONS: dict[str, float] = {
     "io-biodiversity": 0.0001,  # 10m
 }
 
+# Number of bands per collection (for size estimation)
+COLLECTION_BANDS: dict[str, int] = {
+    "sentinel-2-l2a": 3,  # RGB for visualization
+    "landsat-c2-l2": 3,  # RGB
+    "naip": 4,  # RGBN
+    "sentinel-1-rtc": 2,  # VV, VH
+    "cop-dem-glo-30": 1,  # elevation
+    "cop-dem-glo-90": 1,
+    "alos-dem": 1,
+    "esa-worldcover": 1,  # classification
+    "io-lulc-annual-v02": 1,
+    "gridmet": 1,  # single variable
+    "terraclimate": 1,
+}
+
+# Bytes per pixel (float32 = 4 bytes, int16 = 2 bytes)
+BYTES_PER_PIXEL: dict[str, int] = {
+    "sentinel-2-l2a": 2,  # uint16
+    "landsat-c2-l2": 2,  # uint16
+    "naip": 1,  # uint8
+    "sentinel-1-rtc": 4,  # float32
+    "cop-dem-glo-30": 4,  # float32
+    "esa-worldcover": 1,  # uint8
+    "io-lulc-annual-v02": 1,  # uint8
+    "gridmet": 4,  # float32
+}
+
+
+def estimate_download_size(
+    collection: str,
+    bbox: list[float],
+    resolution: float,
+) -> dict[str, Any]:
+    """
+    Estimate the download size for a raster request.
+
+    Parameters
+    ----------
+    collection : str
+        Collection ID
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+    resolution : float
+        Output resolution in degrees
+
+    Returns
+    -------
+    dict[str, Any]
+        Estimation with keys: pixels, bands, size_bytes, size_mb, size_str
+    """
+    west, south, east, north = bbox
+
+    # Calculate pixel dimensions
+    width_deg = abs(east - west)
+    height_deg = abs(north - south)
+
+    width_pixels = int(width_deg / resolution)
+    height_pixels = int(height_deg / resolution)
+    total_pixels = width_pixels * height_pixels
+
+    # Get band count and bytes per pixel
+    num_bands = COLLECTION_BANDS.get(collection, 3)  # Default to 3 bands
+    bytes_per_pixel = BYTES_PER_PIXEL.get(collection, 4)  # Default to float32
+
+    # Calculate size (uncompressed in-memory size)
+    size_bytes = total_pixels * num_bands * bytes_per_pixel
+
+    # Convert to human-readable
+    size_mb = size_bytes / (1024 * 1024)
+    if size_mb < 1:
+        size_str = f"{size_bytes / 1024:.1f} KB"
+    elif size_mb < 1024:
+        size_str = f"{size_mb:.1f} MB"
+    else:
+        size_str = f"{size_mb / 1024:.1f} GB"
+
+    return {
+        "width_pixels": width_pixels,
+        "height_pixels": height_pixels,
+        "total_pixels": total_pixels,
+        "bands": num_bands,
+        "bytes_per_pixel": bytes_per_pixel,
+        "size_bytes": size_bytes,
+        "size_mb": size_mb,
+        "size_str": size_str,
+        "resolution_deg": resolution,
+    }
+
 
 def download_data(
     query: str,
-    aoi: list[float] | str | None = None,
+    aoi: list[float] | str,
     time_range: str | None = None,
     output_dir: str = ".",
     max_cloud_cover: int = 20,
 ) -> dict[str, Any]:
     """
-    Download satellite/raster data from Planetary Computer.
+    Download satellite/raster data from Microsoft Planetary Computer.
 
     Automatically detects collection from query, handles geocoding,
     downloads and crops data, generates visualizations.
@@ -85,49 +209,120 @@ def download_data(
     Parameters
     ----------
     query : str
-        Natural language query (e.g., "sentinel-2 imagery")
-    aoi : list[float] or str or None, optional
-        Bounding box [W,S,E,N] or place name string
+        Natural language query describing the data you want.
+        Examples: "sentinel-2 imagery", "landsat", "naip aerial photos",
+        "elevation data", "land cover"
+    aoi : list[float] or str
+        **Required.** Area of interest as either:
+        - Place name string: "Seattle, WA", "Paris, France", "Central Park, NY"
+        - Bounding box list: [west, south, east, north] in degrees
+          Example: [-122.4, 47.5, -122.3, 47.6]
     time_range : str or None, optional
-        ISO8601 datetime range (e.g., "2024-01-01/2024-01-31")
+        ISO8601 datetime range. Defaults to last 7 days if not provided.
+        Examples: "2024-01-01/2024-01-31", "2024-06-01/2024-06-30"
     output_dir : str, optional
-        Directory to save outputs
+        Directory to save outputs. Defaults to current directory.
     max_cloud_cover : int, optional
-        Maximum cloud cover for optical data
+        Maximum cloud cover percentage for optical data (0-100). Default: 20
 
     Returns
     -------
     dict[str, Any]
-        Dictionary with file paths and metadata
-    """
-    # Detect collection from query
-    collection = detect_collection_from_query(query)
-    if not collection:
-        raise ValueError(f"Could not detect collection from query: {query}")
+        Dictionary containing:
+        - raw: Path to raw GeoTIFF/NetCDF file
+        - visualization: Path to visualization image (JPG)
+        - collection: Detected collection ID
+        - metadata: Dict with CRS, resolution, bounds, etc.
+        - warnings: List of any warnings (e.g., large AOI)
 
-    # Handle AOI
+    Raises
+    ------
+    NoDataFoundError
+        If no data found in time range. Contains 'suggestion' attribute with
+        recommended retry parameters (expanded time range).
+
+    Examples
+    --------
+    >>> # Download recent Sentinel-2 imagery of Paris
+    >>> download_data("sentinel-2 imagery", "Paris, France")
+
+    >>> # Download Landsat data for a specific time and bbox
+    >>> download_data(
+    ...     "landsat",
+    ...     [-122.4, 47.5, -122.3, 47.6],
+    ...     time_range="2024-06-01/2024-06-30"
+    ... )
+
+    >>> # Download NAIP aerial imagery
+    >>> download_data("naip aerial photos", "Central Park, NY")
+    """
+    warnings_list: list[str] = []
+
+    # Detect collection from query (raises AmbiguousCollectionError or NoCollectionMatchError)
+    collection = detect_collection_from_query(query)
+
+    # Handle AOI - now required
     if isinstance(aoi, str):
         # Geocode place name
         bbox = place_to_bbox(aoi)
     elif isinstance(aoi, list):
         bbox = validate_bbox(aoi)
     else:
-        raise TypeError("AOI must be a bounding box list or place name string")
+        raise TypeError(
+            "AOI is required. Provide either:\n"
+            "  - A place name like 'Seattle, WA' or 'Paris, France'\n"
+            "  - A bounding box like [-122.4, 47.5, -122.3, 47.6]"
+        )
+
+    # Validate AOI size
+    aoi_area_km2 = calculate_bbox_area_km2(bbox)
+
+    if aoi_area_km2 > AOI_REJECT_THRESHOLD_KM2:
+        raise ValueError(
+            f"AOI too large ({aoi_area_km2:.0f} km²). "
+            f"Maximum allowed is {AOI_REJECT_THRESHOLD_KM2} km². "
+            "Try a smaller area like a city neighborhood or specific location."
+        )
+
+    if aoi_area_km2 > AOI_WARN_THRESHOLD_KM2:
+        warnings_list.append(
+            f"Large AOI ({aoi_area_km2:.0f} km²). "
+            "Download may take several minutes. Consider using a smaller area for faster results."
+        )
+
+    # Handle time range - default to last week
+    used_default_time_range = False
+    if time_range is None:
+        time_range = get_default_time_range(days=DEFAULT_TIME_RANGE_DAYS)
+        used_default_time_range = True
+        warnings_list.append(
+            f"No time range specified. Using last {DEFAULT_TIME_RANGE_DAYS} days: {time_range}. "
+            "Specify time_range like '2024-06-01/2024-06-30' for specific dates."
+        )
 
     # Get collection type
     data_type = get_collection_type(collection)
 
     if data_type == "raster":
-        return _download_raster_data(
+        result = _download_raster_data(
             collection,
             bbox,
             time_range,
             output_dir,
             max_cloud_cover,
+            aoi_area_km2,
+            used_default_time_range,
         )
-    if data_type == "zarr":
-        return _download_zarr_data(collection, bbox, time_range, output_dir)
-    raise ValueError(f"Unsupported data type: {data_type}")
+    elif data_type == "zarr":
+        result = _download_zarr_data(collection, bbox, time_range, output_dir)
+    else:
+        raise ValueError(f"Unsupported data type: {data_type}")
+
+    # Add warnings to result
+    if warnings_list:
+        result["warnings"] = warnings_list
+
+    return result
 
 
 def _download_raster_data(
@@ -136,6 +331,8 @@ def _download_raster_data(
     time_range: str | None,
     output_dir: str,
     max_cloud_cover: int,
+    aoi_area_km2: float,
+    used_default_time_range: bool = False,
 ) -> dict[str, Any]:
     """
     Download raster data.
@@ -152,6 +349,10 @@ def _download_raster_data(
         Directory to save outputs
     max_cloud_cover : int
         Maximum cloud cover for optical data
+    aoi_area_km2 : float
+        Area of the bounding box in km² (for resolution scaling)
+    used_default_time_range : bool
+        Whether the default time range was used (for suggestion on retry)
 
     Returns
     -------
@@ -163,20 +364,61 @@ def _download_raster_data(
     cloud_cover_collections = ["sentinel-2-l2a", "landsat-c2-l2"]
     cloud_cover = max_cloud_cover if collection in cloud_cover_collections else None
 
-    # Search for items
+    # Search for most recent single item
     items = stac_client.search_items(
         collections=[collection],
         bbox=bbox,
         datetime=time_range,
         max_cloud_cover=cloud_cover,
-        limit=1 if collection == "sentinel-1-rtc" else 5,  # Fewer items for SAR
+        limit=1,  # Only get the most recent item
+        sortby="-datetime",  # Sort by datetime descending (most recent first)
     )
 
     if not items:
-        raise ValueError(f"No data found for {collection} in the specified area/time")
+        # Provide helpful suggestion to expand time range
+        expanded_days = DEFAULT_TIME_RANGE_DAYS + 7  # Suggest expanding by 1 week
+        expanded_time_range = get_default_time_range(days=expanded_days)
+
+        suggestion = {
+            "action": "retry_with_expanded_time_range",
+            "suggested_time_range": expanded_time_range,
+            "suggested_days": expanded_days,
+            "message": (
+                f"No data found for {collection} in the last {DEFAULT_TIME_RANGE_DAYS} days. "
+                f"Try expanding the time range to {expanded_days} days: {expanded_time_range}"
+            ),
+        }
+
+        if used_default_time_range:
+            raise NoDataFoundError(
+                f"No {collection} data found in the last {DEFAULT_TIME_RANGE_DAYS} days "
+                f"for this area. Suggestion: expand time_range to '{expanded_time_range}' "
+                f"(last {expanded_days} days) and retry.",
+                suggestion=suggestion,
+            )
+        else:
+            raise NoDataFoundError(
+                f"No {collection} data found for time range '{time_range}' in this area. "
+                "Try a different time range or expand your search window.",
+                suggestion=None,
+            )
 
     # Get native resolution for collection (default to 10m if unknown)
-    resolution = NATIVE_RESOLUTIONS.get(collection, 0.0001)
+    native_resolution = NATIVE_RESOLUTIONS.get(collection, 0.0001)
+
+    # Scale resolution based on AOI size to prevent massive downloads
+    resolution_scale = 1
+    for threshold, scale in RESOLUTION_SCALE_THRESHOLDS:
+        if aoi_area_km2 <= threshold:
+            resolution_scale = scale
+            break
+    else:
+        resolution_scale = 16  # Maximum scaling for very large AOIs
+
+    resolution = native_resolution * resolution_scale
+
+    # Estimate download size and add to metadata
+    size_estimate = estimate_download_size(collection, bbox, resolution)
 
     # Only load bands needed for visualization to speed up processing
     # NAIP: multi-band single asset - use specialized loader
@@ -219,11 +461,19 @@ def _download_raster_data(
     if time_range:
         metadata["datetime"] = time_range
 
+    # Add size estimate to metadata
+    metadata["size_estimate"] = size_estimate
+
     return {
         "raw": str(raw_path),
         "visualization": str(vis_path),
         "collection": collection,
         "metadata": metadata,
+        "download_info": {
+            "estimated_size": size_estimate["size_str"],
+            "dimensions": f"{size_estimate['width_pixels']}x{size_estimate['height_pixels']} pixels",
+            "resolution_deg": size_estimate["resolution_deg"],
+        },
     }
 
 
@@ -356,90 +606,6 @@ def _create_zarr_visualizations(
         visualizations["visualization"] = str(spatial_path)
 
     return visualizations
-
-
-def _create_zarr_visualization(
-    data: Any,
-    output_path: str,
-    collection: str,
-) -> None:
-    """
-    Create time series visualization for Zarr climate data.
-
-    Plots spatial mean over time for the first variable.
-
-    Parameters
-    ----------
-    data : Any
-        xarray Dataset with climate data
-    output_path : str
-        Output file path for visualization
-    collection : str
-        Collection name for plot title
-
-    Returns
-    -------
-    None
-        Visualization is saved to the specified output path
-    """
-    import matplotlib.pyplot as plt
-
-    # Get the first data variable
-    var_name = next(iter(data.data_vars))
-    var_data = data[var_name]
-
-    # Find time dimension
-    time_dim = None
-    for dim in ["time", "day"]:
-        if dim in var_data.dims:
-            time_dim = dim
-            break
-
-    if time_dim is None:
-        # No time dimension - create spatial plot instead
-        _create_spatial_plot(var_data, output_path, var_name, collection)
-        return
-
-    # Calculate spatial mean over time
-    spatial_dims = [d for d in var_data.dims if d != time_dim]
-    time_series = var_data.mean(dim=spatial_dims)
-
-    # Create figure
-    _fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Plot time series
-    time_vals = data[time_dim].values
-    values = time_series.values
-
-    # Handle units (e.g., Kelvin to Celsius for temperature)
-    units = var_data.attrs.get("units", "")
-    if units == "K" and "temperature" in var_name.lower():
-        values = values - 273.15
-        units = "°C"
-
-    ax.plot(time_vals, values, linewidth=1.5, color="#2563eb")
-    ax.fill_between(time_vals, values, alpha=0.3, color="#2563eb")
-
-    # Styling
-    ax.set_xlabel("Date", fontsize=12)
-    ylabel = f"{var_name}"
-    if units:
-        ylabel += f" ({units})"
-    ax.set_ylabel(ylabel, fontsize=12)
-
-    title = f"{collection.upper()}: {var_name}"
-    ax.set_title(title, fontsize=14, fontweight="bold")
-
-    ax.grid(True, alpha=0.3)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    # Rotate x-axis labels
-    plt.xticks(rotation=45, ha="right")
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close()
 
 
 def _create_zarr_animation(

@@ -240,39 +240,3 @@ def get_raster_metadata(data: xr.Dataset) -> dict[str, Any]:
         if data_array.name
         else ["data"],
     }
-
-
-def crop_raster_to_bbox(
-    data: xr.Dataset,
-    bbox: list[float],
-) -> xr.Dataset:
-    """
-    Crop raster to bounding box.
-
-    Parameters
-    ----------
-    data : xr.Dataset
-        Xarray Dataset
-    bbox : list[float]
-        [west, south, east, north]
-
-    Returns
-    -------
-    xr.Dataset
-        Cropped Dataset
-    """
-    west, south, east, north = bbox
-
-    # Apply to all variables
-    cropped = {}
-    for var_name in data.data_vars:
-        try:
-            cropped[var_name] = data[var_name].rio.clip_box(
-                west, south, east, north, allow_one_dimensional_raster=True
-            )
-        except Exception as e:
-            # If clipping fails, return original
-            print(f"Warning: Clipping failed for {var_name}: {e}")
-            cropped[var_name] = data[var_name]
-
-    return xr.Dataset(cropped, attrs=data.attrs)

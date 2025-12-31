@@ -371,10 +371,10 @@ def test_download_gridmet_small_area_climate_visualization():
     from planetary_computer_mcp.tools.download_data import download_data
 
     # Small AOI in California for fast processing (4km resolution)
-    # California extent for meaningful but fast spatial patterns
+    # ~30x30km area in central California (within 1000 km² limit)
     result = download_data(
         query="gridmet temperature",
-        aoi=[-124, 32, -114, 42],  # California extent
+        aoi=[-121.5, 37.5, -121.2, 37.8],  # ~30x30km in Central Valley
         time_range="2020-06-01/2020-06-03",  # 3 days for fast animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -420,11 +420,11 @@ def test_download_terraclimate_small_area_climate_visualization():
     """Test downloading TerraClimate data with small-area heatmap visualization."""
     from planetary_computer_mcp.tools.download_data import download_data
 
-    # Small AOI in US East Coast for fast processing (4km resolution)
-    # East Coast extent for meaningful but fast spatial patterns
+    # Small AOI in North Carolina for fast processing (4km resolution)
+    # ~30x30km area to stay under 1000 km² limit
     result = download_data(
         query="terraclimate",
-        aoi=[-85, 30, -70, 45],  # US East Coast extent
+        aoi=[-80.0, 35.0, -79.7, 35.3],  # Small NC region
         time_range="2020-01-01/2020-03-31",  # 3 months for fast animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -532,7 +532,6 @@ def test_create_zarr_visualizations_with_time(mock_zarr_dataset):
     output_dir = tempfile.mkdtemp()
 
     with (
-        patch("planetary_computer_mcp.tools.download_data._create_zarr_visualization"),
         patch("planetary_computer_mcp.tools.download_data._create_zarr_animation"),
         patch("planetary_computer_mcp.tools.download_data._create_spatial_snapshot"),
     ):
@@ -576,30 +575,6 @@ def test_create_zarr_visualizations_no_time(mock_spatial_data):
         # Should only have spatial visualization
         assert "visualization" in result
         assert len(result) == 1
-
-
-@pytest.mark.fast
-def test_create_zarr_visualization(mock_zarr_dataset):
-    """Test _create_zarr_visualization creates a time series plot.
-
-    Parameters
-    ----------
-    mock_zarr_dataset : xr.Dataset
-        Mock dataset fixture
-
-    Returns
-    -------
-    None
-        Test passes if visualization file is created
-    """
-    from planetary_computer_mcp.tools.download_data import _create_zarr_visualization
-
-    output_path = Path(tempfile.mkdtemp()) / "test_viz.jpg"
-
-    _create_zarr_visualization(mock_zarr_dataset, str(output_path), "test-collection")
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
 
 
 @pytest.mark.fast

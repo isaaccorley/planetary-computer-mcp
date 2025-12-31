@@ -39,7 +39,6 @@ classifiers = [
 dependencies = [
   "adlfs>=2025.8",
   "contextily>=1.7",
-  "duckdb>=1",
   "fastmcp>=2.14.1",
   "geopandas>=0.14",
   "geopy>=2.4",
