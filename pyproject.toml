@@ -4,7 +4,7 @@ requires = [ "uv-build>=0.9.3,<0.10" ]
 
 [project]
 name = "planetary-computer-mcp"
-version = "1.1.0"
+version = "1.1.1"
 description = "A Python MCP Server for interacting with the Planetary Computer STAC Catalog."
 readme = "README.md"
 keywords = [
