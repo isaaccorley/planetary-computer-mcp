@@ -1,6 +1,12 @@
 import * as vscode from "vscode";
 
 export function activate(context: vscode.ExtensionContext) {
+  // Check if MCP API is available
+  if (!vscode.lm?.registerMcpServerDefinitionProvider) {
+    console.log("planetary-computer-mcp: MCP API not available in this VS Code version");
+    return;
+  }
+
   const didChangeEmitter = new vscode.EventEmitter<void>();
   context.subscriptions.push(didChangeEmitter);
 
@@ -21,4 +27,10 @@ export function activate(context: vscode.ExtensionContext) {
       },
     })
   );
+
+  console.log("planetary-computer-mcp: Extension activated");
+}
+
+export function deactivate() {
+  // Cleanup handled by disposables in context.subscriptions
 }
