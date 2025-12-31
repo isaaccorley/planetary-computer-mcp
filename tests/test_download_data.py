@@ -649,3 +649,29 @@ def test_create_zarr_animation(mock_zarr_dataset):
     assert output_path.exists()
     assert output_path.stat().st_size > 0
     assert output_path.suffix == ".gif"
+
+
+@pytest.mark.fast
+def test_get_adaptive_search_limit():
+    """Test adaptive search limit based on AOI size.
+
+    Returns
+    -------
+    None
+        Test passes if limits scale correctly with AOI size
+    """
+    from planetary_computer_mcp.tools.download_data import get_adaptive_search_limit
+
+    # Small AOI: 1 item
+    assert get_adaptive_search_limit(5) == 1
+
+    # Medium AOI: more items
+    assert get_adaptive_search_limit(30) == 2
+    assert get_adaptive_search_limit(75) == 5
+
+    # Large AOI: max items
+    assert get_adaptive_search_limit(300) == 10
+    assert get_adaptive_search_limit(800) == 20
+
+    # Very large AOI: cap at max
+    assert get_adaptive_search_limit(2000) == 20

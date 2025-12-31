@@ -41,6 +41,16 @@ RESOLUTION_SCALE_THRESHOLDS = [
     (1000, 16),  # 500-1000 km²: 16x coarser
 ]
 
+# Adaptive search limits based on AOI size
+# Larger AOIs need more items to find good coverage
+SEARCH_LIMIT_THRESHOLDS = [
+    (10, 1),  # < 10 km²: 1 item (small area, single scene covers it)
+    (50, 2),  # 10-50 km²: 2 items
+    (100, 5),  # 50-100 km²: 5 items
+    (500, 10),  # 100-500 km²: 10 items
+    (1000, 20),  # 500-1000 km²: 20 items (large area, may need multiple scenes)
+]
+
 
 class NoDataFoundError(Exception):
     """
@@ -191,6 +201,30 @@ def estimate_download_size(
         "size_str": size_str,
         "resolution_deg": resolution,
     }
+
+
+def get_adaptive_search_limit(aoi_area_km2: float) -> int:
+    """
+    Get adaptive search limit based on AOI size.
+
+    Larger AOIs may need more items to find good scene coverage.
+    Small AOIs typically need only 1 item.
+
+    Parameters
+    ----------
+    aoi_area_km2 : float
+        Area of the bounding box in km²
+
+    Returns
+    -------
+    int
+        Recommended search limit (1-20)
+    """
+    for threshold, limit in SEARCH_LIMIT_THRESHOLDS:
+        if aoi_area_km2 < threshold:
+            return limit
+    # Default to max for very large AOIs
+    return SEARCH_LIMIT_THRESHOLDS[-1][1]
 
 
 def download_data(
@@ -364,13 +398,17 @@ def _download_raster_data(
     cloud_cover_collections = ["sentinel-2-l2a", "landsat-c2-l2"]
     cloud_cover = max_cloud_cover if collection in cloud_cover_collections else None
 
-    # Search for most recent single item
+    # Use adaptive search limit based on AOI size
+    # Larger AOIs may need more items to find good coverage
+    search_limit = get_adaptive_search_limit(aoi_area_km2)
+
+    # Search for items
     items = stac_client.search_items(
         collections=[collection],
         bbox=bbox,
         datetime=time_range,
         max_cloud_cover=cloud_cover,
-        limit=1,  # Only get the most recent item
+        limit=search_limit,
         sortby="-datetime",  # Sort by datetime descending (most recent first)
     )
 
