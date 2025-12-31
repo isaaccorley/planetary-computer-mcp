@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.1.2 (2025-12-31)
+
+### Bug Fixes
+
+- **vscode**: Fix MCP API compatibility for VS Code 1.107+
+  ([#12](https://github.com/isaaccorley/planetary-computer-mcp/pull/12),
+  [`6cc2302`](https://github.com/isaaccorley/planetary-computer-mcp/commit/6cc2302b0735660b4abdd813603576285dbd205f))
+
+
 ## v1.1.1 (2025-12-31)
 
 ### Bug Fixes
