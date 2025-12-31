@@ -175,3 +175,6 @@ commit_parser = "conventional"
 changelog_file = "CHANGELOG.md"
 changelog_mode = "update"
 vcs_release = true
+
+[tool.semantic_release.commit_parser_options]
+parse_squash_commits = false
