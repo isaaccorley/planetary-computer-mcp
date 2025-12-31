@@ -7,9 +7,8 @@
 ### Bug Fixes
 
 - Fix server startup warning & changelog
-  ([#11](https://github.com/isaaccorley/planetary-computer-mcp/pull/11),
-  [`a5b6281`](https://github.com/isaaccorley/planetary-computer-mcp/commit/a5b62815963216c1ac645393006b62b93618f2e2))
-
+    ([#11](https://github.com/isaaccorley/planetary-computer-mcp/pull/11),
+    [`a5b6281`](https://github.com/isaaccorley/planetary-computer-mcp/commit/a5b62815963216c1ac645393006b62b93618f2e2))
 
 ## v1.1.0 (2025-12-30)
 
