@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-01-01)
+
+### Features
+
+- UX Improvements, Optimizations, and Code Cleanup
+  ([#13](https://github.com/isaaccorley/planetary-computer-mcp/pull/13),
+  [`c81f104`](https://github.com/isaaccorley/planetary-computer-mcp/commit/c81f104edaeb40cf5407341be32fa0b91afbdfc6))
+
+
 ## v1.1.2 (2025-12-31)
 
 ### Bug Fixes
