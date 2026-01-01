@@ -35,7 +35,7 @@ A Python implementation of the Planetary Computer MCP server, providing unified 
 ## Features
 
 - **Unified Interface**: Single `download_data` tool that automatically detects datasets from natural language queries
-- **Geocoding**: Convert place names (e.g., "San Francisco") to bounding boxes
+- **Natural Language Geocoding**: Automatically converts place names (e.g., "San Francisco", "the Alps", "Amazon rainforest") to geospatial bounding box coordinates using the Nominatim geocoding service—no need to manually specify coordinates
 - **Multi-format Support**: Raster (GeoTIFF), Vector (GeoParquet), and Zarr data
 - **Automatic Visualization**: Generate RGB/JPEG previews for LLM analysis
 - **Fast Downloads**: Uses odc-stac for efficient COG access
