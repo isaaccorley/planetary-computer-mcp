@@ -23,7 +23,7 @@ pytestmark = pytest.mark.ux
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("sentinel-2 imagery", "sentinel-2-l2a"),
         ("sentinel imagery of los angeles", "sentinel-2-l2a"),
@@ -31,8 +31,16 @@ pytestmark = pytest.mark.ux
         ("get me sentinel-2 for this area", "sentinel-2-l2a"),
     ],
 )
-def test_sentinel2_prompts(query, expected_collection):
-    """Test Sentinel-2 natural language queries."""
+def test_sentinel2_prompts(query: str, expected_collection: str) -> None:
+    """Test Sentinel-2 natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -51,15 +59,23 @@ def test_sentinel2_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("landsat imagery", "landsat-c2-l2"),
         ("landsat data", "landsat-c2-l2"),
         ("landsat-8 imagery", "landsat-c2-l2"),
     ],
 )
-def test_landsat_prompts(query, expected_collection):
-    """Test Landsat natural language queries."""
+def test_landsat_prompts(query: str, expected_collection: str) -> None:
+    """Test Landsat natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -77,15 +93,23 @@ def test_landsat_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("naip aerial photos", "naip"),
         ("aerial imagery", "naip"),
     ],
 )
 @pytest.mark.slow
-def test_naip_prompts(query, expected_collection):
-    """Test NAIP natural language queries (slow - ~40s each)."""
+def test_naip_prompts(query: str, expected_collection: str) -> None:
+    """Test NAIP natural language queries (slow - ~40s each).
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -108,7 +132,7 @@ def test_naip_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("sentinel-1 radar", "sentinel-1-rtc"),
         ("sar imagery", "sentinel-1-rtc"),
@@ -116,8 +140,16 @@ def test_naip_prompts(query, expected_collection):
         ("sentinel-1 data", "sentinel-1-rtc"),
     ],
 )
-def test_sar_prompts(query, expected_collection):
-    """Test SAR/radar natural language queries."""
+def test_sar_prompts(query: str, expected_collection: str) -> None:
+    """Test SAR/radar natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -140,7 +172,7 @@ def test_sar_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("elevation data", "cop-dem-glo-30"),
         ("dem", "cop-dem-glo-30"),
@@ -149,8 +181,16 @@ def test_sar_prompts(query, expected_collection):
         ("copernicus dem", "cop-dem-glo-30"),
     ],
 )
-def test_dem_prompts(query, expected_collection):
-    """Test DEM/elevation natural language queries."""
+def test_dem_prompts(query: str, expected_collection: str) -> None:
+    """Test DEM/elevation natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -173,7 +213,7 @@ def test_dem_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("land cover", "esa-worldcover"),
         ("landcover classification", "esa-worldcover"),
@@ -181,8 +221,16 @@ def test_dem_prompts(query, expected_collection):
         ("esa worldcover", "esa-worldcover"),
     ],
 )
-def test_landcover_prompts(query, expected_collection):
-    """Test land cover natural language queries."""
+def test_landcover_prompts(query: str, expected_collection: str) -> None:
+    """Test land cover natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -200,15 +248,23 @@ def test_landcover_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("lulc", "io-lulc-annual-v02"),
         ("land use", "io-lulc-annual-v02"),
         ("esri land use", "io-lulc-annual-v02"),
     ],
 )
-def test_lulc_prompts(query, expected_collection):
-    """Test LULC natural language queries."""
+def test_lulc_prompts(query: str, expected_collection: str) -> None:
+    """Test LULC natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -231,7 +287,7 @@ def test_lulc_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("gridmet climate data", "gridmet"),
         ("gridmet temperature", "gridmet"),
@@ -241,8 +297,16 @@ def test_lulc_prompts(query, expected_collection):
         ("precipitation data", "gridmet"),
     ],
 )
-def test_gridmet_prompts(query, expected_collection):
-    """Test GridMET climate natural language queries."""
+def test_gridmet_prompts(query: str, expected_collection: str) -> None:
+    """Test GridMET climate natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -260,14 +324,22 @@ def test_gridmet_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("terraclimate", "terraclimate"),
         ("terraclimate monthly", "terraclimate"),
     ],
 )
-def test_terraclimate_prompts(query, expected_collection):
-    """Test TerraClimate natural language queries."""
+def test_terraclimate_prompts(query: str, expected_collection: str) -> None:
+    """Test TerraClimate natural language queries.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -290,15 +362,23 @@ def test_terraclimate_prompts(query, expected_collection):
 
 
 @pytest.mark.parametrize(
-    "query,expected_collection",
+    ("query", "expected_collection"),
     [
         ("building footprints", "ms-buildings"),
         ("buildings", "ms-buildings"),
         ("microsoft buildings", "ms-buildings"),
     ],
 )
-def test_buildings_query_detection(query, expected_collection):
-    """Test MS Buildings query detection (collection detection only)."""
+def test_buildings_query_detection(query: str, expected_collection: str) -> None:
+    """Test MS Buildings query detection (collection detection only).
+
+    Parameters
+    ----------
+    query : str
+        Natural language query to test.
+    expected_collection : str
+        Expected STAC collection ID.
+    """
     from planetary_computer_mcp.core.collections import detect_collection_from_query
 
     start = time.perf_counter()
@@ -342,8 +422,14 @@ def test_buildings_download():
         "Shibuya, Tokyo",
     ],
 )
-def test_geocoding_prompts(place_name):
-    """Test place name geocoding in queries."""
+def test_geocoding_prompts(place_name: str) -> None:
+    """Test place name geocoding in queries.
+
+    Parameters
+    ----------
+    place_name : str
+        Place name to geocode.
+    """
     from planetary_computer_mcp.tools.download_data import download_data
 
     start = time.perf_counter()
@@ -376,8 +462,14 @@ def test_geocoding_prompts(place_name):
         "remote sensing data",
     ],
 )
-def test_ambiguous_queries_raise_error(query):
-    """Test that ambiguous queries raise helpful errors."""
+def test_ambiguous_queries_raise_error(query: str) -> None:
+    """Test that ambiguous queries raise helpful errors.
+
+    Parameters
+    ----------
+    query : str
+        Ambiguous query that should raise an error.
+    """
     from planetary_computer_mcp.core.collections import (
         AmbiguousCollectionError,
         detect_collection_from_query,
@@ -402,8 +494,14 @@ def test_ambiguous_queries_raise_error(query):
         "foobar qux",
     ],
 )
-def test_unknown_queries_raise_error(query):
-    """Test that unknown queries raise helpful errors."""
+def test_unknown_queries_raise_error(query: str) -> None:
+    """Test that unknown queries raise helpful errors.
+
+    Parameters
+    ----------
+    query : str
+        Unknown query that should raise an error.
+    """
     from planetary_computer_mcp.core.collections import (
         NoCollectionMatchError,
         detect_collection_from_query,
