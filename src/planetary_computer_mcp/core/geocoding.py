@@ -89,7 +89,8 @@ def _cache_key(place_name: str) -> str:
     """
     # Normalize: lowercase, strip whitespace, collapse multiple spaces
     normalized = " ".join(place_name.lower().split())
-    return hashlib.md5(normalized.encode()).hexdigest()
+    # Use BLAKE2b for deterministic, cross-platform hashing of cache keys
+    return hashlib.blake2b(normalized.encode("utf-8"), digest_size=16).hexdigest()
 
 
 def _is_cache_valid(entry: dict) -> bool:

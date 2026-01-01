@@ -535,6 +535,7 @@ def test_create_zarr_visualizations_with_time(mock_zarr_dataset):
     output_dir = tempfile.mkdtemp()
 
     with (
+        patch("planetary_computer_mcp.tools.download_data._create_zarr_visualization"),
         patch("planetary_computer_mcp.tools.download_data._create_zarr_animation"),
         patch("planetary_computer_mcp.tools.download_data._create_spatial_snapshot"),
     ):

@@ -174,10 +174,6 @@ def _download_quadkey_collection(collection: str, bbox: list[float]) -> gpd.GeoD
 
     return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
 
-    import pandas as pd
-
-    return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
-
 
 def _get_regions_for_bbox(bbox: list[float]) -> list[str]:
     """
