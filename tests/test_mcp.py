@@ -6,6 +6,7 @@ These tests verify the full MCP tool call flow for download_data and download_ge
 
 import json
 import os
+import select
 import subprocess
 import tempfile
 import time
@@ -19,11 +20,12 @@ import pytest
 def test_mcp_download_data_tool():
     """Test MCP server download_data tool call with sentinel-2 imagery."""
     # Start server process with stdio
+    # Note: stderr=DEVNULL to avoid deadlock from verbose Azure/adlfs logging
     proc = subprocess.Popen(
         ["uv", "run", "python", "-m", "planetary_computer_mcp.server"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         text=True,
         bufsize=1,  # Line buffered
     )
@@ -43,14 +45,15 @@ def test_mcp_download_data_tool():
                 "clientInfo": {"name": "test-client", "version": "1.0.0"},
             },
         }
+        assert proc.stdin is not None
+        assert proc.stdout is not None
         proc.stdin.write(json.dumps(init_msg) + "\n")
         proc.stdin.flush()
 
         # Read initialize response
         response_line = proc.stdout.readline().strip()
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(f"Server failed to respond to initialize. stderr: {stderr}")
+            pytest.fail("Server failed to respond to initialize")
 
         init_response = json.loads(response_line)
         assert init_response["id"] == 1
@@ -70,8 +73,7 @@ def test_mcp_download_data_tool():
         # Read tools/list response
         response_line = proc.stdout.readline().strip()
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(f"Server failed to respond to tools/list. stderr: {stderr}")
+            pytest.fail("Server failed to respond to tools/list")
 
         tools_response = json.loads(response_line)
         assert tools_response["id"] == 3
@@ -103,8 +105,6 @@ def test_mcp_download_data_tool():
         proc.stdin.flush()
 
         # Read tool call response (with timeout for slow operation)
-        import select
-
         # Wait up to 60 seconds for response (MS Buildings download can take 15-25s)
         timeout = 60
         start_time = time.time()
@@ -119,12 +119,10 @@ def test_mcp_download_data_tool():
                     break
 
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(
-                f"Server failed to respond to tool call within {timeout}s. stderr: {stderr}"
-            )
+            pytest.fail(f"Server failed to respond to tool call within {timeout}s")
 
-        tool_response = json.loads(response_line)  # type: ignore[arg-type]
+        assert response_line is not None
+        tool_response = json.loads(response_line)
         assert tool_response["id"] == 2
         assert "result" in tool_response
 
@@ -166,11 +164,12 @@ def test_mcp_download_geometries_tool():
         pytest.skip("Skipping MS Buildings download test in CI - unreliable network/API")
 
     # Start server process with stdio
+    # Note: stderr=DEVNULL to avoid deadlock from verbose Azure/adlfs logging
     proc = subprocess.Popen(
         ["uv", "run", "python", "-m", "planetary_computer_mcp.server"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         text=True,
         bufsize=1,  # Line buffered
     )
@@ -190,14 +189,15 @@ def test_mcp_download_geometries_tool():
                 "clientInfo": {"name": "test-client", "version": "1.0.0"},
             },
         }
+        assert proc.stdin is not None
+        assert proc.stdout is not None
         proc.stdin.write(json.dumps(init_msg) + "\n")
         proc.stdin.flush()
 
         # Read initialize response
         response_line = proc.stdout.readline().strip()
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(f"Server failed to respond to initialize. stderr: {stderr}")
+            pytest.fail("Server failed to respond to initialize")
 
         init_response = json.loads(response_line)
         assert init_response["id"] == 1
@@ -217,8 +217,7 @@ def test_mcp_download_geometries_tool():
         # Read tools/list response
         response_line = proc.stdout.readline().strip()
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(f"Server failed to respond to tools/list. stderr: {stderr}")
+            pytest.fail("Server failed to respond to tools/list")
 
         tools_response = json.loads(response_line)
         assert tools_response["id"] == 3
@@ -251,8 +250,6 @@ def test_mcp_download_geometries_tool():
         proc.stdin.flush()
 
         # Read tool call response (with timeout for slow operation)
-        import select
-
         # Wait up to 60 seconds for response (MS Buildings download can take 15-25s)
         timeout = 60
         start_time = time.time()
@@ -267,12 +264,10 @@ def test_mcp_download_geometries_tool():
                     break
 
         if not response_line:
-            stderr = proc.stderr.read()
-            pytest.fail(
-                f"Server failed to respond to tool call within {timeout}s. stderr: {stderr}"
-            )
+            pytest.fail(f"Server failed to respond to tool call within {timeout}s")
 
-        tool_response = json.loads(response_line)  # type: ignore[arg-type]
+        assert response_line is not None
+        tool_response = json.loads(response_line)
         assert tool_response["id"] == 2
         assert "result" in tool_response
 

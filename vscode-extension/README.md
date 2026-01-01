@@ -36,6 +36,7 @@ This extension registers an [MCP server](https://spec.modelcontextprotocol.io/) 
 - **One-Click Setup**: Automatically configures the MCP server in your VS Code settings
 - **Satellite Imagery Access**: Query Sentinel-2, NAIP, Landsat, and HLS collections
 - **Geospatial Downloads**: Download RGB images, multispectral bands, and vector data
+- **Natural Language Geocoding**: Automatically converts place names (e.g., "San Francisco", "the Alps") to geospatial coordinates—no need to manually specify bounding boxes
 - **GitHub Copilot Integration**: Works seamlessly with VS Code's Copilot Chat
 - **Real-time Processing**: Auto URL signing and streaming downloads
 
@@ -46,7 +47,7 @@ Once configured, open Copilot Chat and use these tools:
 - **`download_data`**: Unified tool for raster, DEM, land cover, and climate data
 
     - Natural language queries (e.g., "sentinel-2 imagery", "elevation data")
-    - Place names or bounding boxes
+    - Place names automatically geocoded to coordinates (e.g., "Seattle", "Rocky Mountains") or explicit bounding boxes
     - Time range filtering
     - Automatic RGB visualization generation
 

@@ -182,7 +182,7 @@ def test_download_sentinel2_data():
 
 ## Dependencies
 
-- **Runtime**: mcp, planetary-computer, pystac-client, odc-stac, xarray, rioxarray, geopandas, duckdb, matplotlib, contextily, adlfs, pyarrow
+- **Runtime**: mcp, planetary-computer, pystac-client, odc-stac, xarray, rioxarray, geopandas, matplotlib, contextily, adlfs, pyarrow
 - **Dev**: ruff, ty, pytest, pytest-cov, pre-commit
 
 ## Ruff Rules (Key)

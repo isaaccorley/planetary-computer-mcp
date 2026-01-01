@@ -115,9 +115,11 @@ def test_download_esa_worldcover_data():
     from planetary_computer_mcp.tools.download_data import download_data
 
     # Small AOI for 10m resolution
+    # ESA WorldCover is a static dataset (2020/2021), need explicit time_range
     result = download_data(
         query="land cover",
         aoi=[-118.3, 34.0, -118.2, 34.1],  # 0.1 x 0.1 deg
+        time_range="2021-01-01/2021-12-31",
         output_dir=tempfile.mkdtemp(),
     )
 
@@ -142,9 +144,11 @@ def test_download_dem_data():
     from planetary_computer_mcp.tools.download_data import download_data
 
     # Small AOI for 30m resolution
+    # Copernicus DEM is a static dataset, need explicit time_range
     result = download_data(
         query="elevation dem",
         aoi=[-118.3, 34.0, -118.2, 34.1],  # 0.1 x 0.1 deg
+        time_range="2021-01-01/2021-12-31",
         output_dir=tempfile.mkdtemp(),
     )
 
@@ -202,7 +206,6 @@ def test_download_ms_buildings():
         collection="ms-buildings",
         aoi=[-122.345, 47.605, -122.335, 47.615],  # 0.01 x 0.01 deg Seattle
         output_dir=tempfile.mkdtemp(),
-        limit=1000,
     )
 
     # Check that files were created
@@ -273,11 +276,11 @@ def test_download_gridmet_large_area_climate_visualization():
     """Test downloading GridMET climate data with large-area heatmap visualization."""
     from planetary_computer_mcp.tools.download_data import download_data
 
-    # Large AOI in Western US for meaningful spatial patterns (4km resolution)
-    # This creates a heatmap visualization and animation
+    # AOI in Southern California (~900 km² to stay under 1000 km² limit)
+    # GridMET is 4km resolution so this gives ~75x75 grid cells
     result = download_data(
         query="gridmet temperature",
-        aoi=[-125, 32, -110, 42],  # Western US extent
+        aoi=[-118.5, 34.0, -118.2, 34.3],  # ~30x30 km area
         time_range="2020-06-01/2020-06-07",  # One week for animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -327,11 +330,11 @@ def test_download_terraclimate_large_area_climate_visualization():
     """Test downloading TerraClimate data with large-area heatmap visualization."""
     from planetary_computer_mcp.tools.download_data import download_data
 
-    # Large AOI in North America for meaningful spatial patterns (4km resolution)
-    # This creates a heatmap visualization and animation
+    # AOI in Southern California (~900 km² to stay under 1000 km² limit)
+    # TerraClimate is 4km resolution so this gives meaningful spatial patterns
     result = download_data(
         query="terraclimate",
-        aoi=[-130, 20, -60, 50],  # North America extent
+        aoi=[-118.5, 34.0, -118.2, 34.3],  # ~30x30 km area
         time_range="2020-01-01/2020-12-31",  # Full year for animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -371,10 +374,10 @@ def test_download_gridmet_small_area_climate_visualization():
     from planetary_computer_mcp.tools.download_data import download_data
 
     # Small AOI in California for fast processing (4km resolution)
-    # California extent for meaningful but fast spatial patterns
+    # ~30x30km area in central California (within 1000 km² limit)
     result = download_data(
         query="gridmet temperature",
-        aoi=[-124, 32, -114, 42],  # California extent
+        aoi=[-121.5, 37.5, -121.2, 37.8],  # ~30x30km in Central Valley
         time_range="2020-06-01/2020-06-03",  # 3 days for fast animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -420,11 +423,11 @@ def test_download_terraclimate_small_area_climate_visualization():
     """Test downloading TerraClimate data with small-area heatmap visualization."""
     from planetary_computer_mcp.tools.download_data import download_data
 
-    # Small AOI in US East Coast for fast processing (4km resolution)
-    # East Coast extent for meaningful but fast spatial patterns
+    # Small AOI in North Carolina for fast processing (4km resolution)
+    # ~30x30km area to stay under 1000 km² limit
     result = download_data(
         query="terraclimate",
-        aoi=[-85, 30, -70, 45],  # US East Coast extent
+        aoi=[-80.0, 35.0, -79.7, 35.3],  # Small NC region
         time_range="2020-01-01/2020-03-31",  # 3 months for fast animation
         output_dir=tempfile.mkdtemp(),
     )
@@ -532,7 +535,6 @@ def test_create_zarr_visualizations_with_time(mock_zarr_dataset):
     output_dir = tempfile.mkdtemp()
 
     with (
-        patch("planetary_computer_mcp.tools.download_data._create_zarr_visualization"),
         patch("planetary_computer_mcp.tools.download_data._create_zarr_animation"),
         patch("planetary_computer_mcp.tools.download_data._create_spatial_snapshot"),
     ):
@@ -576,30 +578,6 @@ def test_create_zarr_visualizations_no_time(mock_spatial_data):
         # Should only have spatial visualization
         assert "visualization" in result
         assert len(result) == 1
-
-
-@pytest.mark.fast
-def test_create_zarr_visualization(mock_zarr_dataset):
-    """Test _create_zarr_visualization creates a time series plot.
-
-    Parameters
-    ----------
-    mock_zarr_dataset : xr.Dataset
-        Mock dataset fixture
-
-    Returns
-    -------
-    None
-        Test passes if visualization file is created
-    """
-    from planetary_computer_mcp.tools.download_data import _create_zarr_visualization
-
-    output_path = Path(tempfile.mkdtemp()) / "test_viz.jpg"
-
-    _create_zarr_visualization(mock_zarr_dataset, str(output_path), "test-collection")
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
 
 
 @pytest.mark.fast
@@ -674,3 +652,29 @@ def test_create_zarr_animation(mock_zarr_dataset):
     assert output_path.exists()
     assert output_path.stat().st_size > 0
     assert output_path.suffix == ".gif"
+
+
+@pytest.mark.fast
+def test_get_adaptive_search_limit():
+    """Test adaptive search limit based on AOI size.
+
+    Returns
+    -------
+    None
+        Test passes if limits scale correctly with AOI size
+    """
+    from planetary_computer_mcp.tools.download_data import get_adaptive_search_limit
+
+    # Small AOI: 1 item
+    assert get_adaptive_search_limit(5) == 1
+
+    # Medium AOI: more items
+    assert get_adaptive_search_limit(30) == 2
+    assert get_adaptive_search_limit(75) == 5
+
+    # Large AOI: max items
+    assert get_adaptive_search_limit(300) == 10
+    assert get_adaptive_search_limit(800) == 20
+
+    # Very large AOI: cap at max
+    assert get_adaptive_search_limit(2000) == 20
