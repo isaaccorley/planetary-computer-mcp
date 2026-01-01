@@ -9,6 +9,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import planetary_computer as pc
 from pystac_client import Client
+from shapely.geometry import box
 
 from ..core import (
     place_to_bbox,
@@ -16,9 +17,20 @@ from ..core import (
 )
 from ..core.vector_utils import (
     get_vector_metadata,
-    query_geoparquet_spatially,
+    query_geoparquet_by_quadkey,
     save_geodataframe_as_parquet,
 )
+
+# Collections that use quadkey partitioning with known structure
+# Format: {collection: {base_path_template, account_name, quadkey_level}}
+QUADKEY_COLLECTIONS = {
+    "ms-buildings": {
+        # Path pattern: RegionName={region}/quadkey={qk}/
+        "base_path": "footprints/global/2022-07-06/ml-buildings.parquet",
+        "account_name": "bingmlbuildings",
+        "quadkey_level": 9,
+    }
+}
 
 
 def download_geometries(
@@ -51,14 +63,11 @@ def download_geometries(
     else:
         raise TypeError("AOI must be a bounding box list or place name string")
 
-    # Search STAC for parquet items intersecting bbox
-    base_path, storage_options = _get_parquet_info_for_collection(collection, bbox)
-
-    if not base_path or not storage_options:
-        raise ValueError(f"No parquet data found for {collection} in bbox {bbox}")
-
-    # Query spatially
-    gdf = query_geoparquet_spatially(base_path, bbox, storage_options)
+    # Get data using appropriate method
+    if collection in QUADKEY_COLLECTIONS:
+        gdf = _download_quadkey_collection(collection, bbox)
+    else:
+        gdf = _download_stac_collection(collection, bbox)
 
     if len(gdf) == 0:
         raise ValueError(f"No geometries found for {collection} in the specified area")
@@ -95,51 +104,222 @@ def download_geometries(
     }
 
 
-def _get_parquet_info_for_collection(
-    collection: str, bbox: list[float]
-) -> tuple[str | None, dict[str, Any] | None]:
+def _download_quadkey_collection(collection: str, bbox: list[float]) -> gpd.GeoDataFrame:
     """
-    Get parquet base path and storage options for a collection.
+    Download from quadkey-partitioned collection (e.g., MS Buildings).
+
+    Optimized path that uses known collection structure to minimize API calls.
 
     Parameters
     ----------
     collection : str
-        Collection ID (e.g., "ms-buildings")
+        Collection ID
     bbox : list[float]
         Bounding box [west, south, east, north]
 
     Returns
     -------
-    tuple[str | None, dict[str, Any] | None]
-        Tuple of (base_path, storage_options) or (None, None)
+    gpd.GeoDataFrame
+        GeoDataFrame with geometries
     """
+    config = QUADKEY_COLLECTIONS.get(collection)
+    if not config:
+        return _download_quadkey_via_stac(collection, bbox)
+
+    # Determine regions for bbox
+    regions = _get_regions_for_bbox(bbox)
+
+    # Get SAS token via targeted STAC item search (one item)
     catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
     client = Client.open(catalog_url)
 
-    # Search for items intersecting bbox
-    query_params = {}
-
+    # Search for one item to get credentials (faster than intersects query)
     search = client.search(
         collections=[collection],
         bbox=bbox,
-        query=query_params if query_params else None,
         limit=1,
     )
 
     items = list(search.items())
     if not items:
-        return None, None
+        return gpd.GeoDataFrame()
 
-    # Sign item and extract info
+    # Sign to get SAS token
     signed_item = pc.sign(items[0])
     if "data" not in signed_item.assets:
-        return None, None
+        return _download_quadkey_via_stac(collection, bbox)
 
-    asset = signed_item.assets["data"]
-    base_path = asset.href
-    storage_options = asset.extra_fields.get("table:storage_options", {})
+    storage_options = signed_item.assets["data"].extra_fields.get("table:storage_options", {})
+    if not storage_options:
+        return _download_quadkey_via_stac(collection, bbox)
 
-    return base_path, storage_options
+    # Query each region's quadkey partitions directly
+    all_gdfs: list[gpd.GeoDataFrame] = []
+
+    for region in regions:
+        base_href = f"abfs://{config['base_path']}/RegionName={region}"
+        gdf = query_geoparquet_by_quadkey(
+            base_href=base_href,
+            bbox=bbox,
+            storage_options=storage_options,
+            quadkey_level=config["quadkey_level"],
+        )
+        if len(gdf) > 0:
+            all_gdfs.append(gdf)
+
+    if not all_gdfs:
+        return gpd.GeoDataFrame()
+
+    import pandas as pd
+
+    return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
+
+    import pandas as pd
+
+    return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
+
+
+def _get_regions_for_bbox(bbox: list[float]) -> list[str]:
+    """
+    Get MS Buildings region names that may contain the bbox.
+
+    For now, uses simple heuristics. Could be enhanced with proper
+    reverse geocoding.
+
+    Parameters
+    ----------
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+
+    Returns
+    -------
+    list[str]
+        List of region names to query
+    """
+    west, south, east, north = bbox
+
+    regions = []
+
+    # North America
+    if -170 < west < -50 and 24 < north < 72:
+        if south > 24 and north < 50 and west > -130:
+            regions.append("United States")
+        if north > 41 and west < -52:
+            regions.append("Canada")
+        if south < 33 and west > -118 and east < -86:
+            regions.append("Mexico")
+
+    # If no match, default to US (most common case)
+    if not regions:
+        regions = ["United States"]
+
+    return regions
+
+
+def _download_quadkey_via_stac(collection: str, bbox: list[float]) -> gpd.GeoDataFrame:
+    """
+    Download quadkey collection via STAC item search (slower fallback).
+
+    Parameters
+    ----------
+    collection : str
+        Collection ID
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        GeoDataFrame with geometries
+    """
+    catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
+    client = Client.open(catalog_url)
+
+    # Search to find the region item(s) and get credentials
+    aoi_geom = box(bbox[0], bbox[1], bbox[2], bbox[3])
+    search = client.search(
+        collections=[collection],
+        intersects=aoi_geom,
+        limit=10,
+    )
+
+    items = list(search.items())
+    if not items:
+        return gpd.GeoDataFrame()
+
+    # Sign items to get storage credentials
+    signed_items = [pc.sign(item) for item in items]
+
+    # Process each matching region item
+    all_gdfs: list[gpd.GeoDataFrame] = []
+    for item in signed_items:
+        if "data" not in item.assets:
+            continue
+
+        data_asset = item.assets["data"]
+        storage_options = data_asset.extra_fields.get("table:storage_options", {})
+        if not storage_options:
+            continue
+
+        # Query using quadkey-based approach
+        gdf = query_geoparquet_by_quadkey(
+            base_href=data_asset.href,
+            bbox=bbox,
+            storage_options=storage_options,
+            quadkey_level=9,
+        )
+        if len(gdf) > 0:
+            all_gdfs.append(gdf)
+
+    if not all_gdfs:
+        return gpd.GeoDataFrame()
+
+    import pandas as pd
+
+    return gpd.GeoDataFrame(pd.concat(all_gdfs, ignore_index=True), crs="EPSG:4326")
+
+
+def _download_stac_collection(collection: str, bbox: list[float]) -> gpd.GeoDataFrame:
+    """
+    Download from STAC-based collection where items map directly to parquet files.
+
+    Parameters
+    ----------
+    collection : str
+        Collection ID
+    bbox : list[float]
+        Bounding box [west, south, east, north]
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        GeoDataFrame with geometries
+    """
+    from ..core.vector_utils import query_geoparquet_from_items
+
+    catalog_url = "https://planetarycomputer.microsoft.com/api/stac/v1"
+    client = Client.open(catalog_url)
+
+    aoi_geom = box(bbox[0], bbox[1], bbox[2], bbox[3])
+    search = client.search(
+        collections=[collection],
+        intersects=aoi_geom,
+        limit=100,
+    )
+
+    items = list(search.items())
+    if not items:
+        return gpd.GeoDataFrame()
+
+    signed_items = [pc.sign(item) for item in items]
+
+    # Get storage options from first item
+    if "data" not in signed_items[0].assets:
+        return gpd.GeoDataFrame()
+
+    storage_options = signed_items[0].assets["data"].extra_fields.get("table:storage_options", {})
+
+    return query_geoparquet_from_items(signed_items, bbox, storage_options)
 
 
 def _create_vector_visualization(gdf: gpd.GeoDataFrame, output_path: str, bbox: list[float]) -> str:

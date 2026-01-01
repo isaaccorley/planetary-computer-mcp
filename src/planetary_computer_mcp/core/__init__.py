@@ -21,6 +21,10 @@ from planetary_computer_mcp.core.geocoding import (
 )
 from planetary_computer_mcp.core.raster_utils import download_multiband_to_geotiff
 from planetary_computer_mcp.core.stac_client import PlanetaryComputerSTAC, stac_client
+from planetary_computer_mcp.core.vector_utils import (
+    get_quadkeys_for_bbox,
+    query_geoparquet_by_quadkey,
+)
 from planetary_computer_mcp.core.zarr_utils import (
     COORD_MAPPINGS,
     DEFAULT_VARIABLES,
@@ -49,11 +53,13 @@ __all__ = [
     "get_cache_stats",
     "get_collection_type",
     "get_default_time_range",
+    "get_quadkeys_for_bbox",
     "get_zarr_metadata",
     "get_zarr_store_url",
     "load_and_compute_zarr",
     "load_zarr_data",
     "place_to_bbox",
+    "query_geoparquet_by_quadkey",
     "save_zarr_subset_as_netcdf",
     "stac_client",
     "validate_bbox",
