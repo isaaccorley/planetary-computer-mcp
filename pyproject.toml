@@ -145,6 +145,7 @@ markers = [
   "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
   "fast: marks tests as fast-running (suitable for frequent execution)",
   "slow: marks tests as slow-running (skip in CI or when speed is critical)",
+  "ux: marks UX/prompt tests (excluded from CI, run manually for baseline metrics)",
 ]
 
 [tool.numpydoc_validation]

@@ -19,6 +19,7 @@ from planetary_computer_mcp.core.geocoding import (
     place_to_bbox,
     validate_bbox,
 )
+from planetary_computer_mcp.core.raster_utils import download_multiband_to_geotiff
 from planetary_computer_mcp.core.stac_client import PlanetaryComputerSTAC, stac_client
 from planetary_computer_mcp.core.zarr_utils import (
     COORD_MAPPINGS,
@@ -43,6 +44,7 @@ __all__ = [
     "calculate_bbox_area_km2",
     "clear_geocoding_cache",
     "detect_collection_from_query",
+    "download_multiband_to_geotiff",
     "get_available_variables",
     "get_cache_stats",
     "get_collection_type",

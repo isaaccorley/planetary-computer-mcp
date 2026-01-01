@@ -29,7 +29,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7.1
         with:
             enable-cache: true
-      - run: uv run --all-extras --dev pytest -vvv --cov=src
+      - run: uv run --all-extras --dev pytest -vvv -m "not ux" --cov=src
       - name: Report Coverage
         run: uv run --all-extras --dev coverage report -m
 

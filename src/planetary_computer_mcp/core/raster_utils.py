@@ -2,7 +2,6 @@
 Raster utilities using odc-stac for COG loading and processing.
 """
 
-import contextlib
 from typing import Any
 
 import rioxarray  # noqa: F401
@@ -60,18 +59,19 @@ def load_raster_from_stac(
     return load(items, **load_kwargs)
 
 
-def load_multiband_asset(
+def download_multiband_to_geotiff(
     items: list[Item],
     asset_name: str,
+    output_path: str,
     bbox: list[float] | None = None,
-    resolution: float | None = None,
     band_names: list[str] | None = None,
-) -> xr.Dataset:
+    overview_level: int | None = None,
+) -> dict[str, Any]:
     """
-    Load a multi-band asset (like NAIP 'image') using rioxarray.
+    Download a multi-band asset directly to GeoTIFF using rasterio windowed reads.
 
-    odc-stac doesn't handle multi-band single-asset collections well,
-    so we use rioxarray directly for these cases.
+    Bypasses xarray entirely for maximum performance. Uses rasterio's windowed
+    reading to only download pixels within the bbox, then writes directly to disk.
 
     Parameters
     ----------
@@ -79,75 +79,153 @@ def load_multiband_asset(
         Signed STAC items (uses first item only)
     asset_name : str
         Name of the asset to load (e.g., 'image')
+    output_path : str
+        Path for output GeoTIFF file
     bbox : list[float] or None, optional
         Bounding box [west, south, east, north] in EPSG:4326
-    resolution : float or None, optional
-        Output resolution in degrees (ignored - uses native resolution)
     band_names : list[str] or None, optional
         Names for the bands (e.g., ['red', 'green', 'blue', 'nir'])
+    overview_level : int or None, optional
+        COG overview level to use (2, 4, 8, etc.). None = native resolution.
+        Use overview_level=4 for ~4x faster downloads at reduced resolution.
 
     Returns
     -------
-    xr.Dataset
-        Xarray Dataset with named bands
+    dict[str, Any]
+        Metadata dict with crs, bounds, shape, dtype, bands
     """
-    import rioxarray as rxr  # Local import for type checking
+    import rasterio  # type: ignore[import-not-found]
+    from affine import Affine  # type: ignore[import-not-found]
     from rasterio.crs import CRS  # type: ignore[import-not-found]
     from rasterio.warp import transform_bounds  # type: ignore[import-not-found]
+    from rasterio.windows import from_bounds  # type: ignore[import-not-found]
 
     if not items:
         raise ValueError("No items provided")
 
-    item = items[0]  # Use first item
+    item = items[0]
     if asset_name not in item.assets:
         raise ValueError(f"Asset '{asset_name}' not found in item")
 
     href = item.assets[asset_name].href
 
-    # Load with rioxarray (supports COGs with windowed reads)
-    data = rxr.open_rasterio(href)
-    if not isinstance(data, xr.DataArray):
-        raise TypeError("Expected DataArray from rioxarray")
+    with rasterio.open(href) as src:
+        native_crs = src.crs
+        num_bands = src.count
+        dtype = src.dtypes[0]
 
-    # Clip and reproject if bbox provided
-    if bbox:
-        native_crs = data.rio.crs
-
-        # Transform bbox from WGS84 to native CRS for clipping
-        if native_crs and str(native_crs) != "EPSG:4326":
+        if bbox:
+            # Transform bbox from WGS84 to native CRS
             west, south, east, north = bbox
-            native_bounds = transform_bounds(
-                CRS.from_epsg(4326),
-                native_crs,
-                west,
-                south,
-                east,
-                north,
+            if native_crs and str(native_crs) != "EPSG:4326":
+                native_bounds = transform_bounds(
+                    CRS.from_epsg(4326),
+                    native_crs,
+                    west,
+                    south,
+                    east,
+                    north,
+                )
+            else:
+                native_bounds = (west, south, east, north)
+
+            # Create window from bounds
+            window = from_bounds(
+                native_bounds[0],
+                native_bounds[1],
+                native_bounds[2],
+                native_bounds[3],
+                transform=src.transform,
             )
-            # Clip in native CRS (preserves native resolution)
-            with contextlib.suppress(Exception):
-                data = data.rio.clip_box(*native_bounds)
 
-            # Reproject to WGS84 after clipping
-            data = data.rio.reproject("EPSG:4326")
+            full_width = int(window.width)
+            full_height = int(window.height)
+
+            # If using overview level, read at reduced resolution
+            if overview_level and overview_level > 1:
+                out_width = max(1, full_width // overview_level)
+                out_height = max(1, full_height // overview_level)
+                out_shape = (num_bands, out_height, out_width)
+                data = src.read(window=window, out_shape=out_shape)
+
+                # Adjust transform for reduced resolution
+                window_transform = src.window_transform(window)
+                scaled_transform = Affine(
+                    window_transform.a * overview_level,
+                    window_transform.b,
+                    window_transform.c,
+                    window_transform.d,
+                    window_transform.e * overview_level,
+                    window_transform.f,
+                )
+                window_transform = scaled_transform
+            else:
+                data = src.read(window=window)
+                window_transform = src.window_transform(window)
+
+            bounds = native_bounds
         else:
-            # Already in WGS84, just clip
-            with contextlib.suppress(Exception):
-                data = data.rio.clip_box(*bbox)
+            if overview_level and overview_level > 1:
+                out_width = max(1, src.width // overview_level)
+                out_height = max(1, src.height // overview_level)
+                out_shape = (num_bands, out_height, out_width)
+                data = src.read(out_shape=out_shape)
 
-    # Convert to Dataset with named bands
-    num_bands = data.shape[0] if len(data.shape) > 2 else 1
-    if band_names and len(band_names) <= num_bands:
-        # Create dataset with named bands
-        datasets = {}
-        for i, name in enumerate(band_names):
-            if i < num_bands:
-                band_data = data.isel(band=i) if len(data.shape) > 2 else data
-                datasets[name] = band_data.drop_vars("band", errors="ignore")
-        return xr.Dataset(datasets)
-    else:
-        # Return as single variable
-        return xr.Dataset({"data": data})
+                window_transform = Affine(
+                    src.transform.a * overview_level,
+                    src.transform.b,
+                    src.transform.c,
+                    src.transform.d,
+                    src.transform.e * overview_level,
+                    src.transform.f,
+                )
+            else:
+                data = src.read()
+                window_transform = src.transform
+
+            bounds = src.bounds
+
+        height, width = data.shape[1], data.shape[2]
+
+        # Write directly to GeoTIFF
+        profile = {
+            "driver": "GTiff",
+            "dtype": dtype,
+            "width": width,
+            "height": height,
+            "count": num_bands,
+            "crs": native_crs,
+            "transform": window_transform,
+            "compress": "lzw",
+            "tiled": True,
+            "blockxsize": 256,
+            "blockysize": 256,
+        }
+
+        with rasterio.open(output_path, "w", **profile) as dst:
+            dst.write(data)
+
+            # Write band descriptions if provided
+            if band_names:
+                for i, name in enumerate(band_names[:num_bands], start=1):
+                    dst.set_band_description(i, name)
+
+    # Return metadata
+    names = (
+        band_names[:num_bands]
+        if band_names and len(band_names) <= num_bands
+        else [f"band_{i + 1}" for i in range(num_bands)]
+    )
+
+    return {
+        "crs": str(native_crs),
+        "bounds": bounds,
+        "resolution": (abs(window_transform.a), abs(window_transform.e)),
+        "shape": (height, width),
+        "dtype": str(dtype),
+        "bands": names,
+        "overview_level": overview_level or 1,
+    }
 
 
 def save_raster_as_geotiff(

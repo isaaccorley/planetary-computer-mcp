@@ -8,6 +8,7 @@ from typing import Any
 from ..core import (
     calculate_bbox_area_km2,
     detect_collection_from_query,
+    download_multiband_to_geotiff,
     get_collection_type,
     get_default_time_range,
     place_to_bbox,
@@ -16,13 +17,13 @@ from ..core import (
 )
 from ..core.raster_utils import (
     get_raster_metadata,
-    load_multiband_asset,
     load_raster_from_stac,
     save_raster_as_geotiff,
 )
 from ..core.visualization import (
     create_colormap_visualization,
     create_rgb_visualization,
+    create_rgb_visualization_from_geotiff,
 )
 
 # AOI size limits in km²
@@ -32,14 +33,9 @@ AOI_REJECT_THRESHOLD_KM2 = 1000  # Reject AOIs larger than this
 # Default time range in days
 DEFAULT_TIME_RANGE_DAYS = 7  # Default to last week
 
-# Resolution scaling factors based on AOI size
-RESOLUTION_SCALE_THRESHOLDS = [
-    (10, 1),  # < 10 km²: native resolution
-    (50, 2),  # 10-50 km²: 2x coarser
-    (100, 4),  # 50-100 km²: 4x coarser
-    (500, 8),  # 100-500 km²: 8x coarser
-    (1000, 16),  # 500-1000 km²: 16x coarser
-]
+# Size thresholds for warnings (in MB, uncompressed estimate)
+SIZE_WARN_THRESHOLD_MB = 100  # Warn user about large downloads
+SIZE_LARGE_THRESHOLD_MB = 500  # Strongly warn about very large downloads
 
 # Adaptive search limits based on AOI size
 # Larger AOIs need more items to find good coverage
@@ -384,7 +380,7 @@ def _download_raster_data(
     max_cloud_cover : int
         Maximum cloud cover for optical data
     aoi_area_km2 : float
-        Area of the bounding box in km² (for resolution scaling)
+        Area of the bounding box in km² (for adaptive search limits)
     used_default_time_range : bool
         Whether the default time range was used (for suggestion on retry)
 
@@ -442,67 +438,104 @@ def _download_raster_data(
             )
 
     # Get native resolution for collection (default to 10m if unknown)
-    native_resolution = NATIVE_RESOLUTIONS.get(collection, 0.0001)
+    resolution = NATIVE_RESOLUTIONS.get(collection, 0.0001)
 
-    # Scale resolution based on AOI size to prevent massive downloads
-    resolution_scale = 1
-    for threshold, scale in RESOLUTION_SCALE_THRESHOLDS:
-        if aoi_area_km2 <= threshold:
-            resolution_scale = scale
-            break
-    else:
-        resolution_scale = 16  # Maximum scaling for very large AOIs
-
-    resolution = native_resolution * resolution_scale
-
-    # Estimate download size and add to metadata
+    # Estimate download size at native resolution
     size_estimate = estimate_download_size(collection, bbox, resolution)
 
-    # Only load bands needed for visualization to speed up processing
-    # NAIP: multi-band single asset - use specialized loader
-    # Others: separate band assets - use odc-stac
-    if collection == "naip":
-        # NAIP has 4-band 'image' asset (R,G,B,NIR)
-        data = load_multiband_asset(
-            items,
-            asset_name="image",
-            bbox=bbox,
-            resolution=resolution,
-            band_names=["red", "green", "blue", "nir"],
+    # Warn about large downloads
+    warnings_list: list[str] = []
+    if size_estimate["size_mb"] > SIZE_LARGE_THRESHOLD_MB:
+        warnings_list.append(
+            f"Very large download (~{size_estimate['size_str']}). "
+            f"This may take several minutes. Consider using a smaller AOI for faster results."
         )
-    elif collection in ["sentinel-2-l2a", "landsat-c2-l2", "sentinel-1-rtc"]:
-        from ..core.visualization import get_rgb_bands_for_collection
+    elif size_estimate["size_mb"] > SIZE_WARN_THRESHOLD_MB:
+        warnings_list.append(
+            f"Large download (~{size_estimate['size_str']}). Download may take a minute or more."
+        )
 
-        bands = get_rgb_bands_for_collection(collection)
-        data = load_raster_from_stac(items, bbox, bands=bands, resolution=resolution)
-    else:
-        data = load_raster_from_stac(items, bbox, resolution=resolution)
-
-    # Generate visualization
+    # Generate paths
     raw_path = Path(output_dir) / f"{collection}-data.tif"
     vis_path = Path(output_dir) / f"{collection}-visual.jpg"
 
-    save_raster_as_geotiff(data, str(raw_path))
+    # NAIP: use direct-to-GeoTIFF for maximum performance (no xarray overhead)
+    # Others: use odc-stac which handles mosaicking multiple items
+    if collection == "naip":
+        # NAIP has 4-band 'image' asset (R,G,B,NIR) - download directly to GeoTIFF
+        # Use 4x overview by default for ~6s downloads instead of ~45s
+        # Native 30cm resolution available but SLOW for large AOIs
+        #
+        # For Central Park (~4km²):
+        #   Native (30cm): 9100x13273 pixels = 460MB = ~45s
+        #   4x (1.2m):     2274x3318 pixels  = 29MB  = ~6s
+        #
+        # 1.2m is sufficient for most analysis (land cover, urban features)
+        # Native is needed for fine-grained work (individual trees, cars, etc.)
 
-    # Collections that use RGB visualization (optical + SAR)
-    rgb_collections = ["sentinel-2-l2a", "landsat-c2-l2", "naip", "sentinel-1-rtc"]
+        # Estimate data size to decide on overview level
+        west, south, east, north = bbox
+        width_m = (east - west) * 111000  # Rough degrees to meters at mid-latitudes
+        height_m = (north - south) * 111000
+        native_pixels = (width_m / 0.3) * (height_m / 0.3)  # ~30cm native res
+        native_mb = native_pixels * 4 / (1024 * 1024)  # 4 bytes (4 bands uint8)
 
-    if collection in rgb_collections:
-        create_rgb_visualization(data, str(vis_path), collection)
+        # Use 4x overview for large areas (>100MB native), native for small areas
+        if native_mb > 100:
+            overview_level = 4
+            warnings_list.append(
+                f"Using 1.2m resolution (4x overview) for faster download. "
+                f"Native 30cm resolution would be ~{native_mb:.0f}MB and take ~{native_mb / 10:.0f}s."
+            )
+        else:
+            overview_level = None  # Native resolution
+
+        metadata = download_multiband_to_geotiff(
+            items,
+            asset_name="image",
+            output_path=str(raw_path),
+            bbox=bbox,
+            band_names=["red", "green", "blue", "nir"],
+            overview_level=overview_level,
+        )
+        metadata["collection"] = collection
+        metadata["bbox"] = bbox
+        if time_range:
+            metadata["datetime"] = time_range
+        metadata["size_estimate"] = size_estimate
+
+        # Create visualization from saved GeoTIFF
+        create_rgb_visualization_from_geotiff(str(raw_path), str(vis_path), collection)
+
     else:
-        create_colormap_visualization(data, str(vis_path), collection)
+        # Other collections: use odc-stac with xarray
+        if collection in ["sentinel-2-l2a", "landsat-c2-l2", "sentinel-1-rtc"]:
+            from ..core.visualization import get_rgb_bands_for_collection
 
-    # Extract metadata
-    metadata = get_raster_metadata(data)
-    metadata["collection"] = collection
-    metadata["bbox"] = bbox
-    if time_range:
-        metadata["datetime"] = time_range
+            bands = get_rgb_bands_for_collection(collection)
+            data = load_raster_from_stac(items, bbox, bands=bands, resolution=resolution)
+        else:
+            data = load_raster_from_stac(items, bbox, resolution=resolution)
 
-    # Add size estimate to metadata
-    metadata["size_estimate"] = size_estimate
+        save_raster_as_geotiff(data, str(raw_path))
 
-    return {
+        # Collections that use RGB visualization (optical + SAR)
+        rgb_collections = ["sentinel-2-l2a", "landsat-c2-l2", "sentinel-1-rtc"]
+
+        if collection in rgb_collections:
+            create_rgb_visualization(data, str(vis_path), collection)
+        else:
+            create_colormap_visualization(data, str(vis_path), collection)
+
+        # Extract metadata
+        metadata = get_raster_metadata(data)
+        metadata["collection"] = collection
+        metadata["bbox"] = bbox
+        if time_range:
+            metadata["datetime"] = time_range
+        metadata["size_estimate"] = size_estimate
+
+    result: dict[str, Any] = {
         "raw": str(raw_path),
         "visualization": str(vis_path),
         "collection": collection,
@@ -513,6 +546,11 @@ def _download_raster_data(
             "resolution_deg": size_estimate["resolution_deg"],
         },
     }
+
+    if warnings_list:
+        result["warnings"] = warnings_list
+
+    return result
 
 
 def _download_zarr_data(

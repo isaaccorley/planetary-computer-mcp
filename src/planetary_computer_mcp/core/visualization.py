@@ -203,6 +203,8 @@ def normalize_rgb(rgb_array: np.ndarray, stretch: bool = True) -> np.ndarray:
     """
     Normalize RGB array to 0-255 range.
 
+    Uses in-place operations where possible to minimize memory copies.
+
     Parameters
     ----------
     rgb_array : np.ndarray
@@ -215,27 +217,36 @@ def normalize_rgb(rgb_array: np.ndarray, stretch: bool = True) -> np.ndarray:
     np.ndarray
         Normalized RGB array (0-255)
     """
-    # Handle NaN/inf
-    rgb_array = np.nan_to_num(rgb_array, nan=0, posinf=0, neginf=0)
+    # Work on float32 copy for normalization (single copy instead of multiple)
+    rgb = rgb_array.astype(np.float32, copy=True)
+
+    # Handle NaN/inf in-place
+    np.nan_to_num(rgb, copy=False, nan=0, posinf=0, neginf=0)
 
     if stretch:
         # Percentile stretch
-        p2, p98 = np.percentile(rgb_array, (2, 98), axis=(0, 1))
+        p2, p98 = np.percentile(rgb, (2, 98), axis=(0, 1))
         denom = p98 - p2
         if np.any(denom == 0) or np.any(np.isnan(denom)):
-            # If no variation, use min-max or skip stretch
-            rgb_min = np.min(rgb_array, axis=(0, 1))
-            rgb_max = np.max(rgb_array, axis=(0, 1))
-            rgb_array = (rgb_array - rgb_min) / (rgb_max - rgb_min + 1e-8)
+            # If no variation, use min-max
+            rgb_min = np.min(rgb, axis=(0, 1))
+            rgb_max = np.max(rgb, axis=(0, 1))
+            rgb -= rgb_min
+            rgb /= rgb_max - rgb_min + 1e-8
         else:
-            rgb_array = np.clip((rgb_array - p2) / denom, 0, 1)
+            rgb -= p2
+            rgb /= denom
+            np.clip(rgb, 0, 1, out=rgb)
     else:
-        # Min-max normalization
-        rgb_min = np.min(rgb_array, axis=(0, 1))
-        rgb_max = np.max(rgb_array, axis=(0, 1))
-        rgb_array = (rgb_array - rgb_min) / (rgb_max - rgb_min + 1e-8)
+        # Min-max normalization in-place
+        rgb_min = np.min(rgb, axis=(0, 1))
+        rgb_max = np.max(rgb, axis=(0, 1))
+        rgb -= rgb_min
+        rgb /= rgb_max - rgb_min + 1e-8
 
-    return (rgb_array * 255).astype(np.uint8)
+    # Scale to 0-255 and convert to uint8
+    rgb *= 255
+    return rgb.astype(np.uint8)
 
 
 def get_rgb_bands_for_collection(collection: str) -> list[str]:
@@ -287,3 +298,56 @@ def get_colormap_for_collection(
         return "terrain"  # Matplotlib terrain colormap
 
     return None
+
+
+def create_rgb_visualization_from_geotiff(
+    input_path: str,
+    output_path: str,
+    collection: str,
+    stretch: bool = True,
+) -> str:
+    """
+    Create RGB visualization directly from a GeoTIFF file.
+
+    Reads RGB bands from a GeoTIFF and creates a JPEG visualization,
+    bypassing xarray for maximum performance.
+
+    Parameters
+    ----------
+    input_path : str
+        Path to input GeoTIFF file
+    output_path : str
+        Output JPEG/PNG path
+    collection : str
+        Collection ID for band selection
+    stretch : bool, optional
+        Whether to stretch values for better visualization
+
+    Returns
+    -------
+    str
+        Path to saved visualization
+    """
+    import rasterio  # type: ignore[import-not-found]
+
+    with rasterio.open(input_path) as src:
+        # NAIP: bands are R, G, B, NIR (1, 2, 3, 4)
+        # Read first 3 bands for RGB
+        if src.count >= 3:
+            rgb_data = src.read([1, 2, 3])  # Read R, G, B
+        else:
+            # Single band - replicate to RGB
+            band = src.read(1)
+            rgb_data = np.stack([band, band, band])
+
+    # Transpose from (bands, height, width) to (height, width, bands)
+    rgb_array = np.transpose(rgb_data, (1, 2, 0))
+
+    # Normalize to 0-255
+    rgb_normalized = normalize_rgb(rgb_array, stretch=stretch)
+
+    # Save as image using Pillow
+    img = Image.fromarray(rgb_normalized)
+    img.save(output_path)
+
+    return output_path

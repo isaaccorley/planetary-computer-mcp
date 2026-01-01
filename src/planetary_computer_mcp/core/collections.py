@@ -43,7 +43,7 @@ COLLECTION_INFO: dict[str, dict] = {
     "sentinel-2-l2a": {
         "name": "Sentinel-2 L2A",
         "description": "10m optical imagery, global, 5-day revisit",
-        "keywords": ["sentinel-2", "sentinel", "optical", "multispectral"],
+        "keywords": ["sentinel-2", "optical", "multispectral"],
         "category": "optical",
     },
     "landsat-c2-l2": {
