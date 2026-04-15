@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.1 (2026-04-15)
+
+### Bug Fixes
+
+- Add missing og-image lib and unblock lib/ from root gitignore
+  ([`5dc7bec`](https://github.com/isaaccorley/planetary-computer-mcp/commit/5dc7bec85f1129da84ff2894b62f108d1c1e5bd4))
+
+
 ## v1.3.0 (2026-04-15)
 
 ### Features
