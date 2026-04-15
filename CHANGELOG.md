@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.2 (2026-04-15)
+
+### Bug Fixes
+
+- Add missing sample images (blocked by root gitignore)
+  ([`c8e113c`](https://github.com/isaaccorley/planetary-computer-mcp/commit/c8e113c1e8136eb0ec9e0ceb412c6a9fb8d42428))
+
+
 ## v1.3.1 (2026-04-15)
 
 ### Bug Fixes
