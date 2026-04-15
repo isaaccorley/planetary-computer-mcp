@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-04-15)
+
+### Features
+
+- Add Next.js app with GitHub Pages deploy workflow
+  ([`cc27d30`](https://github.com/isaaccorley/planetary-computer-mcp/commit/cc27d30c4c5cc8b4268873a151205fce5f381bb1))
+
+
 ## v1.2.0 (2026-01-01)
 
 ### Features
