@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: ui-serif, Georgia, serif;
+}
+
+.font-serif {
+  font-family: ui-serif, Georgia, serif;
+}
+
+.font-sans {
+  font-family: system-ui, sans-serif;
+}

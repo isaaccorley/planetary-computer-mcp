@@ -1,0 +1,75 @@
+.globe-background {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.globe-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.globe-container {
+  position: relative;
+  width: 950px;
+  height: 950px;
+}
+
+.globe-placeholder {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(6, 182, 212, 0.3),
+    rgba(79, 70, 229, 0.15) 50%,
+    transparent 70%
+  );
+  filter: blur(40px);
+}
+
+.globe-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.globe-sphere {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: 0 0 80px rgba(15, 118, 110, 0.15);
+  opacity: 0;
+}
+
+.globe-gradient {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(circle, rgba(8, 18, 33, 0.8), transparent 65%);
+  animation: glow-pulse 8s ease-in-out infinite;
+}
+
+@keyframes globe-spin {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.15;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
