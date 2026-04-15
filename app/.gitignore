@@ -2,3 +2,5 @@
 out/
 node_modules/
 *.tsbuildinfo
+# Un-ignore lib/ (blocked by root .gitignore's Python venv pattern)
+!src/lib/
