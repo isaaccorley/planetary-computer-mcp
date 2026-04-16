@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.3 (2026-04-16)
+
+### Bug Fixes
+
+- Manually apply basePath to image srcs for static export
+  ([`9446e3a`](https://github.com/isaaccorley/planetary-computer-mcp/commit/9446e3ac102e81ef9c376e70abf0274f5498a951))
+
+
 ## v1.3.2 (2026-04-15)
 
 ### Bug Fixes
