@@ -5,6 +5,9 @@ import type { InstallationCard } from "@/components/installation-grid";
 import { SpinningGlobe } from "@/components/spinning-globe";
 import { Footer } from "@/components/footer";
 
+// next/image with unoptimized:true does not apply basePath to src in static export
+const b = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const heroStats = [
   { label: "STAC Collections", value: "100+", detail: "Optical, SAR, DEM, Land Cover" },
   { label: "Zero install", value: "uvx", detail: "No docker containers" },
@@ -25,20 +28,20 @@ const installationCards: InstallationCard[] = [
     label: "vscode extension",
     href: "https://marketplace.visualstudio.com/items?itemName=isaaccorley.planetary-computer-mcp",
     description: "Install in VSCode, Cursor, Antigrain, etc.",
-    iconSrc: "/icons/vscode-logo.webp",
+    iconSrc: `${b}/icons/vscode-logo.webp`,
     iconAlt: "VS Code logo",
   },
   {
     label: "pypi package",
     href: "https://pypi.org/project/planetary-computer-mcp/",
     description: "Run instantly via uvx",
-    iconSrc: "/icons/pypi-logo.webp",
+    iconSrc: `${b}/icons/pypi-logo.webp`,
     iconAlt: "PyPI logo",
   },
   {
     label: "mcp.json",
     description: "Click to copy and paste to your mcp.json config file",
-    iconSrc: "/icons/mcp-logo.webp",
+    iconSrc: `${b}/icons/mcp-logo.webp`,
     iconAlt: "MCP logo",
     copyText: mcpConfigSnippet,
   },
@@ -51,7 +54,7 @@ const builtWithCards = [
     href: "https://xarray.pydata.org/en/stable/",
     icon: (
       <Image
-        src="/icons/xarray.webp"
+        src={`${b}/icons/xarray.webp`}
         alt="xarray logo"
         width={40}
         height={40}
@@ -65,7 +68,7 @@ const builtWithCards = [
     href: "https://zarr.readthedocs.io/en/stable/",
     icon: (
       <Image
-        src="/icons/zarr.webp"
+        src={`${b}/icons/zarr.webp`}
         alt="zarr logo"
         width={40}
         height={40}
@@ -79,7 +82,7 @@ const builtWithCards = [
     href: "https://geopandas.org/en/stable/",
     icon: (
       <Image
-        src="/icons/geopandas.webp"
+        src={`${b}/icons/geopandas.webp`}
         alt="Geopandas logo"
         width={40}
         height={40}
@@ -93,42 +96,42 @@ const sampleShots = [
   {
     title: "Sentinel-2 L2A",
     location: "Los Angeles · Optical",
-    src: "/samples/sentinel_2_l2a_medium-la.webp",
+    src: `${b}/samples/sentinel_2_l2a_medium-la.webp`,
   },
   {
     title: "Sentinel-1 RTC",
     location: "Coastal Miami · SAR",
-    src: "/samples/sentinel_1_rtc_coastal-miami.webp",
+    src: `${b}/samples/sentinel_1_rtc_coastal-miami.webp`,
   },
   {
     title: "NAIP",
     location: "Los Angeles · 0.6m RGBIR",
-    src: "/samples/naip_medium-la.webp",
+    src: `${b}/samples/naip_medium-la.webp`,
   },
   {
     title: "ESA WorldCover",
     location: "Rural Iowa · Categorical",
-    src: "/samples/esa_worldcover_rural-iowa.png",
+    src: `${b}/samples/esa_worldcover_rural-iowa.png`,
   },
   {
     title: "MTBS Fire",
     location: "Northern California · Burn severity",
-    src: "/samples/mtbs_fire-ca.png",
+    src: `${b}/samples/mtbs_fire-ca.png`,
   },
   {
     title: "COP DEM",
     location: "Coastal Miami · Elevation",
-    src: "/samples/cop_dem_glo_30_coastal-miami.webp",
+    src: `${b}/samples/cop_dem_glo_30_coastal-miami.webp`,
   },
   {
     title: "Daymet Max Temp",
     location: "Texas · Tmax",
-    src: "/samples/daymet_tmax-tx.webp",
+    src: `${b}/samples/daymet_tmax-tx.webp`,
   },
   {
     title: "TerraClimate PET",
     location: "California · Reference Evapotranspiration",
-    src: "/samples/terraclimate_pet-ca.webp",
+    src: `${b}/samples/terraclimate_pet-ca.webp`,
   },
 ];
 
@@ -139,7 +142,7 @@ export const metadata: Metadata = {
   description:
     "Zero-install Model Context Protocol server for hacking on the Planetary Computer from any MCP client.",
   icons: {
-    icon: "/icons/logo.webp",
+    icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/icons/logo.webp`,
   },
   openGraph: {
     title: "Planetary Computer MCP",
